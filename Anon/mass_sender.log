@@ -1,0 +1,12 @@
+2026-03-19 08:16:36,675 - __main__ - INFO - ✅ Загружено сообщение из message.txt
+2026-03-19 08:16:36,678 - __main__ - INFO - 📁 Найдено 10 файлов сессий
+2026-03-19 08:16:36,679 - __main__ - INFO - 🔄 Инициализация аккаунта: anon_sender
+2026-03-19 08:16:36,801 - telethon.network.mtprotosender - INFO - Connecting to 149.154.175.58:443/TcpFull...
+2026-03-19 08:16:36,818 - telethon.network.mtprotosender - WARNING - Attempt 1 at connecting failed: OSError: [WinError 1232] Сетевая папка недоступна. За информацией о разрешении проблем в сети обратитесь к справочной системе Windows
+2026-03-19 08:16:38,061 - telethon.network.mtprotosender - INFO - Connection to 149.154.175.58:443/TcpFull complete!
+2026-03-19 08:20:47,540 - Account_anon_sender - INFO - ✅ Авторизован как: Bcsvf (ID: 8527354492)
+2026-03-19 08:20:48,945 - Account_anon_sender - INFO - ✅ Бот @MessageAnonBot найден
+2026-03-19 08:20:48,946 - __main__ - INFO - ✅ Аккаунт anon_sender готов к работе
+2026-03-19 08:20:48,947 - __main__ - INFO - 🔄 Инициализация аккаунта: anon_sender10
+2026-03-19 08:20:48,963 - telethon.network.mtprotosender - INFO - Connecting to 149.154.175.58:443/TcpFull...
+2026-03-19 08:20:49,110 - telethon.network.mtprotosender - INFO - Connection to 149.154.175.58:443/TcpFull complete!
