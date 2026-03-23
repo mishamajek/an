@@ -18,6 +18,7 @@ from telethon.errors import FloodWaitError, SessionPasswordNeededError, PhoneCod
 from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument, KeyboardButtonCallback
 from telethon.tl.custom import Message
 from telethon.tl.functions.messages import StartBotRequest
+from telethon.tl.functions.contacts import ResolveUsernameRequest
 
 # Фикс для отображения эмодзи в Windows консоли
 if sys.platform == 'win32':
@@ -30,6 +31,7 @@ API_HASH = '58d3e0f528957980a6194874f2479304'
 
 # ID бота
 BOT_USERNAME = '@MessageAnonBot'
+BOT_USERNAME_WITHOUT_AT = 'MessageAnonBot'
 
 # Папки и файлы
 SESSIONS_FOLDER = 'sessions'
@@ -317,6 +319,7 @@ class AccountSender:
         
         # Состояние аккаунта
         self.bot_entity = None
+        self.bot_peer = None
         self.waiting_for_next = False
         self.sending_enabled = False
         self.send_count = 0
@@ -324,6 +327,7 @@ class AccountSender:
         self.running = True
         self.registered = False
         self.registration_step = 0
+        self.reconnect_attempts = 0
         
         # Защита от множественных вызовов
         self.last_next_command_time = 0
@@ -360,12 +364,7 @@ class AccountSender:
                 self.logger.info(f"✅ Авторизован как: {me.first_name} (ID: {me.id})")
             
             # Находим бота
-            try:
-                self.bot_entity = await self.client.get_input_entity(BOT_USERNAME)
-                self.logger.info(f"✅ Бот {BOT_USERNAME} найден")
-            except Exception as e:
-                self.logger.error(f"❌ Не удалось найти бота: {e}")
-                return False
+            await self.refresh_bot_entity()
             
             # Регистрируем обработчик сообщений
             @self.client.on(events.NewMessage(chats=[self.bot_entity]))
@@ -378,14 +377,35 @@ class AccountSender:
             self.logger.error(f"❌ Ошибка инициализации: {e}")
             return False
     
-    async def ensure_bot_entity(self):
-        """Обновляет сущность бота, если нужно"""
+    async def refresh_bot_entity(self):
+        """Обновляет сущность бота"""
         try:
-            self.bot_entity = await self.client.get_input_entity(BOT_USERNAME)
+            # Пробуем получить через username
+            result = await self.client(functions.contacts.ResolveUsernameRequest(BOT_USERNAME_WITHOUT_AT))
+            self.bot_entity = result.peer
+            self.bot_peer = result.peer
+            self.logger.info(f"✅ Бот {BOT_USERNAME} найден (ID: {result.peer.user_id})")
             return True
         except Exception as e:
-            self.logger.error(f"Ошибка обновления сущности бота: {e}")
+            self.logger.error(f"❌ Не удалось найти бота: {e}")
             return False
+    
+    async def ensure_bot_entity(self):
+        """Обновляет сущность бота, если нужно, с повторными попытками"""
+        if self.bot_entity is None:
+            return await self.refresh_bot_entity()
+        
+        # Проверяем, что сущность валидна, отправив тестовое сообщение
+        try:
+            await self.client.send_message(self.bot_entity, '/start')
+            return True
+        except PeerIdInvalidError:
+            self.logger.warning("Сущность бота устарела, обновляем...")
+            return await self.refresh_bot_entity()
+        except Exception as e:
+            if "bot" in str(e).lower():
+                return await self.refresh_bot_entity()
+            return True
     
     async def run(self):
         """Запускает рассылку на аккаунте"""
@@ -395,6 +415,7 @@ class AccountSender:
             self.last_next_command_time = 0
             self.registered = False
             self.registration_step = 0
+            self.reconnect_attempts = 0
             self.logger.info("🚀 Рассылка запущена")
             await self.send_next_command()
     
@@ -409,8 +430,12 @@ class AccountSender:
         if not self.sending_enabled:
             return
         
-        # Обновляем сущность бота перед отправкой
-        await self.ensure_bot_entity()
+        # Проверяем сущность бота
+        if not await self.ensure_bot_entity():
+            self.logger.error("Не удалось получить сущность бота, повторная попытка через 5 сек")
+            await asyncio.sleep(5)
+            await self.send_next_command()
+            return
         
         current_time = time.time()
         time_since_last = current_time - self.last_next_command_time
@@ -425,6 +450,7 @@ class AccountSender:
             self.send_count += 1
             self.global_stats['total_sent'] = self.global_stats.get('total_sent', 0) + 1
             self.logger.info(f"📤 [{self.send_count}] Отправлена команда /next")
+            self.reconnect_attempts = 0
             
         except FloodWaitError as e:
             wait_time = e.seconds
@@ -436,14 +462,22 @@ class AccountSender:
             
         except PeerIdInvalidError:
             self.logger.warning("⚠️ Ошибка PeerIdInvalid, обновляем сущность бота...")
-            await self.ensure_bot_entity()
-            await asyncio.sleep(1)
+            await self.refresh_bot_entity()
+            await asyncio.sleep(2)
             await self.send_next_command()
             
         except Exception as e:
             self.logger.error(f"❌ Ошибка /next: {e}")
             self.error_count += 1
             self.global_stats['total_errors'] = self.global_stats.get('total_errors', 0) + 1
+            self.reconnect_attempts += 1
+            
+            # Если ошибок слишком много, делаем паузу
+            if self.reconnect_attempts > 5:
+                self.logger.error("Слишком много ошибок, пауза 60 секунд...")
+                await asyncio.sleep(60)
+                self.reconnect_attempts = 0
+            
             await asyncio.sleep(5)
             await self.send_next_command()
     
@@ -764,8 +798,12 @@ class AccountSender:
 
     async def send_target_message(self):
         """Отправка целевого сообщения"""
-        # Обновляем сущность бота перед отправкой
-        await self.ensure_bot_entity()
+        # Проверяем сущность бота
+        if not await self.ensure_bot_entity():
+            self.logger.error("Не удалось получить сущность бота, пропускаем отправку")
+            await asyncio.sleep(5)
+            await self.send_next_command()
+            return
         
         try:
             await self.client.send_message(self.bot_entity, self.message_text)
@@ -785,8 +823,8 @@ class AccountSender:
             
         except PeerIdInvalidError:
             self.logger.warning("⚠️ Ошибка PeerIdInvalid, обновляем сущность бота...")
-            await self.ensure_bot_entity()
-            await asyncio.sleep(1)
+            await self.refresh_bot_entity()
+            await asyncio.sleep(2)
             await self.send_target_message()
             
         except Exception as e:
