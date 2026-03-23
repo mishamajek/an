@@ -56,7 +56,6 @@ os.makedirs(LOG_FOLDER, exist_ok=True)
 
 
 # ================== ПОЛНЫЙ СЛОВАРЬ ЭМОДЗИ ==================
-# (сохраните ваш существующий словарь EMOJI_DICT здесь)
 EMOJI_DICT = {
     'кот': ['🐱', '😺', '😸', '😻', '😽', '🙀', '😿', '😾', '🐈', '🐆'],
     'собака': ['🐶', '🐕', '🦮', '🐕‍🦺', '🐩'],
@@ -364,7 +363,9 @@ class AccountSender:
                 self.logger.info(f"✅ Авторизован как: {me.first_name} (ID: {me.id})")
             
             # Находим бота
-            await self.refresh_bot_entity()
+            if not await self.refresh_bot_entity():
+                self.logger.error("❌ Не удалось найти бота")
+                return False
             
             # Регистрируем обработчик сообщений
             @self.client.on(events.NewMessage(chats=[self.bot_entity]))
@@ -378,24 +379,54 @@ class AccountSender:
             return False
     
     async def refresh_bot_entity(self):
-        """Обновляет сущность бота"""
+        """Обновляет сущность бота несколькими способами"""
+        
+        # Список возможных username бота
+        bot_names = ['@MessageAnonBot', 'MessageAnonBot', 'MessageAnonBot_bot', 'MessageAnon']
+        
+        for bot_name in bot_names:
+            clean_name = bot_name.replace('@', '')
+            
+            # Способ 1: через ResolveUsernameRequest
+            try:
+                result = await self.client(functions.contacts.ResolveUsernameRequest(clean_name))
+                self.bot_entity = result.peer
+                self.logger.info(f"✅ Бот найден через ResolveUsername: {bot_name}")
+                return True
+            except Exception as e:
+                continue
+            
+            # Способ 2: через get_entity
+            try:
+                self.bot_entity = await self.client.get_entity(bot_name)
+                self.logger.info(f"✅ Бот найден через get_entity: {bot_name}")
+                return True
+            except Exception as e:
+                continue
+        
+        # Способ 3: поиск в диалогах
         try:
-            # Пробуем получить через username
-            result = await self.client(functions.contacts.ResolveUsernameRequest(BOT_USERNAME_WITHOUT_AT))
-            self.bot_entity = result.peer
-            self.bot_peer = result.peer
-            self.logger.info(f"✅ Бот {BOT_USERNAME} найден (ID: {result.peer.user_id})")
-            return True
+            async for dialog in self.client.iter_dialogs():
+                if dialog.is_user and dialog.entity and hasattr(dialog.entity, 'username'):
+                    username = dialog.entity.username or ''
+                    if 'MessageAnon' in username or 'messageanon' in username.lower():
+                        self.bot_entity = dialog.entity
+                        self.logger.info(f"✅ Бот найден в диалогах: {dialog.name} (@{username})")
+                        return True
         except Exception as e:
-            self.logger.error(f"❌ Не удалось найти бота: {e}")
-            return False
+            self.logger.warning(f"Поиск в диалогах не сработал: {e}")
+        
+        self.logger.error("❌ Не удалось найти бота ни одним способом")
+        return False
     
     async def ensure_bot_entity(self):
         """Обновляет сущность бота, если нужно, с повторными попытками"""
+        
+        # Если сущности нет, ищем заново
         if self.bot_entity is None:
             return await self.refresh_bot_entity()
         
-        # Проверяем, что сущность валидна, отправив тестовое сообщение
+        # Проверяем, что можем отправить сообщение
         try:
             await self.client.send_message(self.bot_entity, '/start')
             return True
@@ -403,8 +434,11 @@ class AccountSender:
             self.logger.warning("Сущность бота устарела, обновляем...")
             return await self.refresh_bot_entity()
         except Exception as e:
-            if "bot" in str(e).lower():
+            error_str = str(e).lower()
+            if "bot" in error_str or "user" in error_str or "not found" in error_str:
+                self.logger.warning(f"Ошибка при проверке бота: {e}, обновляем...")
                 return await self.refresh_bot_entity()
+            # Если ошибка не связана с сущностью, считаем что всё ок
             return True
     
     async def run(self):
@@ -467,10 +501,16 @@ class AccountSender:
             await self.send_next_command()
             
         except Exception as e:
+            error_str = str(e).lower()
             self.logger.error(f"❌ Ошибка /next: {e}")
             self.error_count += 1
             self.global_stats['total_errors'] = self.global_stats.get('total_errors', 0) + 1
             self.reconnect_attempts += 1
+            
+            # Если ошибка "user not found" или "bot not found" — обновляем сущность
+            if "not found" in error_str or "invalid" in error_str:
+                self.logger.warning("Бот не найден, обновляем сущность...")
+                await self.refresh_bot_entity()
             
             # Если ошибок слишком много, делаем паузу
             if self.reconnect_attempts > 5:
@@ -828,9 +868,16 @@ class AccountSender:
             await self.send_target_message()
             
         except Exception as e:
+            error_str = str(e).lower()
             self.logger.error(f"❌ Ошибка отправки: {e}")
             self.error_count += 1
             self.global_stats['total_errors'] = self.global_stats.get('total_errors', 0) + 1
+            
+            # Если ошибка "bot not found" — обновляем сущность
+            if "not found" in error_str or "invalid" in error_str:
+                self.logger.warning("Бот не найден, обновляем сущность...")
+                await self.refresh_bot_entity()
+            
             await asyncio.sleep(5)
             await self.send_next_command()
 
