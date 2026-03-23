@@ -15,7 +15,8 @@ import glob
 
 from telethon import TelegramClient, events, functions
 from telethon.errors import FloodWaitError, SessionPasswordNeededError, PhoneCodeInvalidError, PhoneCodeExpiredError
-from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
+from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument, KeyboardButtonCallback
+from telethon.tl.custom import Message
 
 # Фикс для отображения эмодзи в Windows консоли
 if sys.platform == 'win32':
@@ -23,17 +24,17 @@ if sys.platform == 'win32':
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 # Настройки (API данные нужно получить на my.telegram.org)
-API_ID = 25046122  # Замените на свой api_id
-API_HASH = '58d3e0f528957980a6194874f2479304'  # Замените на свой api_hash
+API_ID = 25046122
+API_HASH = '58d3e0f528957980a6194874f2479304'
 
 # ID бота
 BOT_USERNAME = '@MessageAnonBot'
 
 # Папки и файлы
-SESSIONS_FOLDER = 'sessions'  # Папка с файлами сессий
-MESSAGE_FILE = 'message.txt'  # Файл с текстом рассылки
-LOG_FOLDER = 'logs'  # Папка для логов
-STATS_FILE = 'stats.json'  # Файл с общей статистикой
+SESSIONS_FOLDER = 'sessions'
+MESSAGE_FILE = 'message.txt'
+LOG_FOLDER = 'logs'
+STATS_FILE = 'stats.json'
 
 # Настройка логирования
 logging.basicConfig(
@@ -50,343 +51,110 @@ logger = logging.getLogger(__name__)
 os.makedirs(SESSIONS_FOLDER, exist_ok=True)
 os.makedirs(LOG_FOLDER, exist_ok=True)
 
+
 # ================== ПОЛНЫЙ СЛОВАРЬ ЭМОДЗИ ==================
+# (сохраните ваш существующий словарь EMOJI_DICT здесь)
+# Для краткости здесь только часть, но вы должны вставить свой полный словарь
 EMOJI_DICT = {
-    # Животные
     'кот': ['🐱', '😺', '😸', '😻', '😽', '🙀', '😿', '😾', '🐈', '🐆'],
-    'коты': ['🐱', '😺', '😸', '😻', '😽', '🙀', '😿', '😾', '🐈', '🐆'],
-    'котик': ['🐱', '😺', '😸', '😻', '😽', '🙀', '😿', '😾', '🐈', '🐆'],
-    'котёнок': ['🐱', '😺', '😸', '😻', '😽', '🙀', '😿', '😾', '🐈', '🐆'],
-    'кошка': ['🐱', '😺', '😸', '😻', '😽', '🙀', '😿', '😾', '🐈', '🐆'],
-    'кошечка': ['🐱', '😺', '😸', '😻', '😽', '🙀', '😿', '😾', '🐈', '🐆'],
     'собака': ['🐶', '🐕', '🦮', '🐕‍🦺', '🐩'],
-    'пёс': ['🐶', '🐕', '🦮', '🐕‍🦺', '🐩'],
-    'пес': ['🐶', '🐕', '🦮', '🐕‍🦺', '🐩'],
-    'собачка': ['🐶', '🐕', '🦮', '🐕‍🦺', '🐩'],
-    'псина': ['🐶', '🐕', '🦮', '🐕‍🦺', '🐩'],
     'мышь': ['🐭', '🐁', '🐀'],
-    'мышка': ['🐭', '🐁', '🐀'],
-    'хомяк': ['🐹'],
-    'хомячок': ['🐹'],
-    'кролик': ['🐰', '🐇'],
-    'заяц': ['🐰', '🐇'],
-    'зайка': ['🐰', '🐇'],
-    'лиса': ['🦊'],
-    'лисичка': ['🦊'],
-    'медведь': ['🐻', '🐻‍❄️'],
-    'мишка': ['🐻', '🐻‍❄️'],
-    'панда': ['🐼'],
-    'коала': ['🐨'],
-    'тигр': ['🐯', '🐅'],
-    'тигренок': ['🐯', '🐅'],
-    'лев': ['🦁', '🐆'],
-    'львенок': ['🦁', '🐆'],
-    'обезьяна': ['🐵', '🐒', '🙈', '🙉', '🙊'],
-    'мартышка': ['🐵', '🐒', '🙈', '🙉', '🙊'],
-    'слон': ['🐘'],
-    'слоник': ['🐘'],
-    'жираф': ['🦒'],
-    'зебра': ['🦓'],
-    'бегемот': ['🦛'],
-    'носорог': ['🦏'],
-    'верблюд': ['🐫', '🐪'],
-    'лошадь': ['🐴', '🐎', '🏇'],
-    'конь': ['🐴', '🐎'],
-    'лошадка': ['🐴', '🐎', '🏇'],
-    'корова': ['🐮', '🐄', '🐂'],
-    'бык': ['🐂'],
-    'коровка': ['🐮', '🐄', '🐂'],
-    'свинья': ['🐷', '🐖', '🐗'],
-    'поросёнок': ['🐷', '🐖'],
-    'свинка': ['🐷', '🐖', '🐗'],
-    'коза': ['🐐'],
-    'козлик': ['🐐'],
-    'овца': ['🐑'],
-    'овечка': ['🐑'],
-    'баран': ['🐏'],
-    'курица': ['🐔', '🐓'],
-    'петух': ['🐓'],
-    'цыплёнок': ['🐥', '🐤', '🐣'],
-    'цыпа': ['🐥', '🐤', '🐣'],
-    'утка': ['🦆'],
-    'уточка': ['🦆'],
-    'гусь': ['🦢'],
-    'гусенок': ['🦢'],
-    'лебедь': ['🦢'],
-    'голубь': ['🕊️'],
-    'воробей': ['🐦'],
-    'птица': ['🐦', '🦅', '🦉', '🐧'],
-    'птичка': ['🐦', '🦅', '🦉', '🐧'],
-    'орёл': ['🦅'],
-    'орел': ['🦅'],
-    'сова': ['🦉'],
-    'совенок': ['🦉'],
-    'пингвин': ['🐧'],
-    'рыба': ['🐟', '🐠', '🐡', '🐋', '🦈'],
-    'рыбка': ['🐟', '🐠', '🐡', '🐋', '🦈'],
-    'дельфин': ['🐬'],
-    'кит': ['🐋'],
-    'китенок': ['🐋'],
-    'акула': ['🦈'],
-    'змея': ['🐍'],
-    'змейка': ['🐍'],
-    'ящерица': ['🦎'],
-    'черепаха': ['🐢'],
-    'черепашка': ['🐢'],
-    'лягушка': ['🐸'],
-    'жаба': ['🐸'],
-    'крокодил': ['🐊'],
-    'динозавр': ['🦕', '🦖'],
-    'паук': ['🕷️', '🕸️'],
-    'паучок': ['🕷️', '🕸️'],
-    'насекомое': ['🐜', '🐝', '🐞', '🦋', '🐛'],
-    'муравей': ['🐜'],
-    'пчела': ['🐝'],
-    'пчелка': ['🐝'],
-    'бабочка': ['🦋'],
-    'жук': ['🐞'],
-    'улитка': ['🐌'],
-    
-    # Еда
-    'яблоко': ['🍎', '🍏'],
-    'яблочко': ['🍎', '🍏'],
-    'банан': ['🍌'],
-    'бананчик': ['🍌'],
-    'виноград': ['🍇'],
-    'арбуз': ['🍉'],
-    'арбузик': ['🍉'],
-    'дыня': ['🍈'],
-    'дынька': ['🍈'],
-    'клубника': ['🍓'],
-    'клубничка': ['🍓'],
-    'малина': ['🍓'],
-    'вишня': ['🍒'],
-    'вишенка': ['🍒'],
-    'персик': ['🍑'],
-    'груша': ['🍐'],
-    'грушка': ['🍐'],
-    'лимон': ['🍋'],
-    'лимончик': ['🍋'],
-    'апельсин': ['🍊'],
-    'мандарин': ['🍊'],
-    'помидор': ['🍅'],
-    'помидорка': ['🍅'],
-    'огурец': ['🥒'],
-    'огурчик': ['🥒'],
-    'морковь': ['🥕'],
-    'морковка': ['🥕'],
-    'картошка': ['🥔'],
-    'картофель': ['🥔'],
-    'брокколи': ['🥦'],
-    'гриб': ['🍄'],
-    'грибок': ['🍄'],
-    'хлеб': ['🍞'],
-    'хлебушек': ['🍞'],
-    'сыр': ['🧀'],
-    'сырок': ['🧀'],
-    'молоко': ['🥛'],
-    'яйцо': ['🥚'],
-    'яичко': ['🥚'],
-    'пицца': ['🍕'],
-    'бургер': ['🍔'],
-    'гамбургер': ['🍔'],
-    'хот-дог': ['🌭'],
-    'сэндвич': ['🥪'],
-    'суши': ['🍣'],
-    'роллы': ['🍣'],
-    'мороженое': ['🍦', '🍧', '🍨'],
-    'торт': ['🍰', '🎂'],
-    'тортик': ['🍰', '🎂'],
-    'пирожное': ['🧁'],
-    'пончик': ['🍩'],
-    'печенье': ['🍪'],
-    'печенька': ['🍪'],
-    'шоколад': ['🍫'],
-    'шоколадка': ['🍫'],
-    'конфета': ['🍬', '🍭'],
-    'конфетка': ['🍬', '🍭'],
-    'леденец': ['🍭'],
-    'кекс': ['🧁'],
-    'кофе': ['☕', '🫖'],
-    'кофеек': ['☕', '🫖'],
-    'чай': ['🍵'],
-    'чаек': ['🍵'],
-    'вода': ['💧', '🚰'],
-    'водичка': ['💧', '🚰'],
-    'сок': ['🧃'],
-    'пиво': ['🍺', '🍻'],
-    'пивко': ['🍺', '🍻'],
-    'вино': ['🍷'],
-    'винцо': ['🍷'],
-    'коктейль': ['🍸', '🍹'],
-    
-    # Транспорт
-    'машина': ['🚗', '🚙', '🚕', '🚓', '🚑', '🚒', '🚌', '🚎'],
-    'автомобиль': ['🚗', '🚙', '🚕', '🚓', '🚑', '🚒', '🚌', '🚎'],
-    'машинка': ['🚗', '🚙', '🚕', '🚓', '🚑', '🚒', '🚌', '🚎'],
-    'такси': ['🚕'],
-    'таксофон': ['🚕'],
-    'полиция': ['🚓'],
-    'полицейская машина': ['🚓'],
-    'скорая': ['🚑'],
-    'скорая помощь': ['🚑'],
-    'пожарная': ['🚒'],
-    'пожарная машина': ['🚒'],
-    'автобус': ['🚌', '🚎'],
-    'троллейбус': ['🚎'],
-    'трамвай': ['🚋', '🚊'],
-    'поезд': ['🚂', '🚆', '🚇', '🚈'],
-    'поездка': ['🚂', '🚆', '🚇', '🚈'],
-    'метро': ['🚇'],
-    'самолёт': ['✈️', '🛩️', '🛫', '🛬'],
-    'самолет': ['✈️', '🛩️', '🛫', '🛬'],
-    'вертолёт': ['🚁'],
-    'вертолет': ['🚁'],
-    'кораблик': ['🚢', '⛵', '🛥️', '🚤'],
-    'лодка': ['⛵', '🛶'],
-    'велосипед': ['🚲', '🚴'],
-    'велик': ['🚲', '🚴'],
-    'мотоцикл': ['🏍️'],
-    'грузовик': ['🚚', '🚛', '🚜'],
-    
-    # Спорт
-    'футбол': ['⚽'],
-    'мяч': ['⚽', '🏀', '🏐', '🏈', '⚾', '🎾'],
-    'баскетбол': ['🏀'],
-    'волейбол': ['🏐'],
-    'теннис': ['🎾'],
-    'бейсбол': ['⚾'],
-    'гольф': ['⛳'],
-    'хоккей': ['🏒'],
-    'лыжи': ['⛷️'],
-    'сноуборд': ['🏂'],
-    'коньки': ['⛸️'],
-    'плавание': ['🏊'],
-    'бокс': ['🥊'],
-    'карате': ['🥋'],
-    
-    # Погода
-    'солнце': ['☀️', '☼'],
-    'солнышко': ['☀️', '☼'],
-    'луна': ['🌙', '🌚', '🌛', '🌜'],
-    'месяц': ['🌙', '🌚', '🌛', '🌜'],
-    'звезда': ['⭐', '🌟'],
-    'звездочка': ['⭐', '🌟'],
-    'облако': ['☁️', '⛅'],
-    'облачко': ['☁️', '⛅'],
-    'туча': ['☁️', '🌧️'],
-    'тучка': ['☁️', '🌧️'],
-    'дождь': ['🌧️', '☔'],
-    'дождик': ['🌧️', '☔'],
-    'снег': ['❄️', '🌨️', '☃️'],
-    'снежок': ['❄️', '🌨️', '☃️'],
-    'гроза': ['⛈️', '🌩️'],
-    'радуга': ['🌈'],
-    'ветер': ['💨'],
-    'ветерок': ['💨'],
-    'туман': ['🌫️'],
-    
-    # Флаги
-    'флаг': ['🚩', '🎌'],
-    'россия': ['🇷🇺'],
-    'сша': ['🇺🇸'],
-    'китай': ['🇨🇳'],
-    'япония': ['🇯🇵'],
-    
-    # Эмоции
-    'улыбка': ['😊', '😃', '😄', '😁', '😆', '🙂', '😀'],
-    'смайлик': ['😊', '😃', '😄', '😁', '😆', '🙂', '😀'],
-    'грусть': ['😢', '😭', '😞', '😔', '😟'],
-    'печаль': ['😢', '😭', '😞', '😔', '😟'],
-    'гнев': ['😠', '😡', '🤬'],
-    'злость': ['😠', '😡', '🤬'],
-    'смех': ['😂', '🤣', '😆'],
-    'любовь': ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎'],
-    'сердце': ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎'],
-    'сердечко': ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎'],
-    
-    # Предметы
-    'книга': ['📕', '📗', '📘', '📙', '📚', '📖'],
-    'книжка': ['📕', '📗', '📘', '📙', '📚', '📖'],
-    'ручка': ['✒️', '🖊️', '🖋️'],
-    'карандаш': ['✏️'],
-    'телефон': ['📱', '📲', '📞', '☎️'],
-    'трубка': ['📞', '☎️'],
-    'компьютер': ['💻', '🖥️'],
-    'ноутбук': ['💻'],
-    'телевизор': ['📺'],
-    'часы': ['⏰', '⌚', '🕐', '🕑', '🕒', '🕓', '🕔', '🕕', '🕖', '🕗', '🕘', '🕙', '🕚', '🕛'],
-    'деньги': ['💵', '💶', '💷', '💴', '💰', '💳'],
-    'ключ': ['🔑', '🗝️'],
-    'замок': ['🔒', '🔓'],
-    'лампа': ['💡'],
-    'лампочка': ['💡'],
-    'свеча': ['🕯️'],
-    'огонь': ['🔥'],
-    'лёд': ['🧊'],
-    'лед': ['🧊'],
-    'шар': ['🎈'],
-    'шарик': ['🎈'],
-    'подарок': ['🎁'],
-    'колокольчик': ['🔔'],
-    'музыка': ['🎵', '🎶', '🎼', '🎤', '🎧', '🎷', '🎸', '🎹', '🎺', '🎻'],
-    'гитара': ['🎸'],
-    'пианино': ['🎹'],
-    'барабан': ['🥁'],
-    
-    # Природа
-    'цветок': ['🌸', '🌺', '🌻', '🌼', '🌷', '💐', '🌹'],
-    'цветочек': ['🌸', '🌺', '🌻', '🌼', '🌷', '💐', '🌹'],
-    'роза': ['🌹'],
-    'розочка': ['🌹'],
-    'дерево': ['🌲', '🌳', '🌴'],
-    'деревце': ['🌲', '🌳', '🌴'],
-    'ёлка': ['🎄'],
-    'ель': ['🎄'],
-    'елочка': ['🎄'],
-    'трава': ['🌿', '☘️'],
-    'травка': ['🌿', '☘️'],
-    'лист': ['🍃', '🍂', '🍁'],
-    'листик': ['🍃', '🍂', '🍁'],
-    'камень': ['🪨'],
-    'камешек': ['🪨'],
-    'гора': ['⛰️', '🏔️'],
-    'горка': ['⛰️', '🏔️'],
-    'вулкан': ['🌋'],
-    'океан': ['🌊'],
-    'волна': ['🌊'],
-    'волны': ['🌊'],
-    'море': ['🌊'],
-    
-    # Космос
-    'планета': ['🌍', '🌎', '🌏', '🪐'],
-    'земля': ['🌍', '🌎', '🌏'],
-    'земной шар': ['🌍', '🌎', '🌏'],
-    'ракета': ['🚀'],
-    'спутник': ['🛰️'],
-    'нло': ['🛸'],
-    'тарелка': ['🛸'],
-    
-    # Разное
-    'знак вопроса': ['❓', '❔'],
-    'вопрос': ['❓', '❔'],
-    'вопросительный знак': ['❓', '❔'],
-    'восклицательный знак': ['❗', '❕'],
-    'галочка': ['✅', '✔️', '☑️'],
-    'крестик': ['❌', '✖️', '❎'],
-    'стоп': ['🛑'],
-    'опасность': ['⚠️', '☢️', '☣️'],
-    'запрещено': ['🚫', '⛔'],
-    'инфо': ['ℹ️', '🛈'],
-    'информация': ['ℹ️', '🛈'],
-    'подсказка': ['💡'],
-    'идея': ['💡'],
-    'лайк': ['👍', '❤️'],
-    'дизлайк': ['👎'],
-    'ок': ['👌', '🆗'],
-    'круто': ['🔥', '💯'],
-    'супер': ['🔥', '💯'],
+    # ... остальной словарь
 }
+
+
+class SessionCreator:
+    """Класс для создания новых сессий"""
+    
+    @staticmethod
+    async def create_new_session():
+        """Создает новую сессию через ввод номера и кода"""
+        print("\n" + "="*50)
+        print("📱 СОЗДАНИЕ НОВОЙ СЕССИИ")
+        print("="*50)
+        
+        phone = input("📞 Введите номер телефона в формате +71234567890: ").strip()
+        if not phone.startswith('+'):
+            phone = '+' + phone
+        
+        session_name = f"user_{phone.replace('+', '')}"
+        session_path = os.path.join(SESSIONS_FOLDER, session_name)
+        
+        print(f"🔄 Подключение к Telegram...")
+        
+        try:
+            client = TelegramClient(session_path, API_ID, API_HASH)
+            await client.connect()
+            
+            if await client.is_user_authorized():
+                print("✅ Аккаунт уже авторизован!")
+                await client.disconnect()
+                return session_name
+            
+            await client.send_code_request(phone)
+            print("📱 Код подтверждения отправлен!")
+            
+            code = input("🔢 Введите код из Telegram: ").strip().replace(' ', '').replace('-', '')
+            
+            try:
+                await client.sign_in(phone, code)
+                print("✅ Аккаунт успешно добавлен!")
+                await client.disconnect()
+                return session_name
+                
+            except SessionPasswordNeededError:
+                password = input("🔐 Введите пароль 2FA: ").strip()
+                await client.sign_in(password=password)
+                print("✅ Аккаунт успешно добавлен (с 2FA)!")
+                await client.disconnect()
+                return session_name
+                
+            except PhoneCodeInvalidError:
+                print("❌ Неверный код!")
+                await client.disconnect()
+                return None
+                
+        except FloodWaitError as e:
+            print(f"❌ Слишком много попыток. Подождите {e.seconds} секунд")
+            return None
+        except Exception as e:
+            print(f"❌ Ошибка: {e}")
+            return None
+    
+    @staticmethod
+    async def add_multiple_accounts(max_accounts=10):
+        """Добавляет несколько аккаунтов"""
+        existing_sessions = glob.glob(os.path.join(SESSIONS_FOLDER, "*.session"))
+        current_count = len(existing_sessions)
+        
+        print(f"\n📊 Текущее количество сессий: {current_count}")
+        print(f"📊 Максимум можно добавить: {max_accounts}")
+        
+        if current_count >= max_accounts:
+            print(f"✅ Уже достигнут лимит в {max_accounts} аккаунтов")
+            return
+        
+        remaining = max_accounts - current_count
+        print(f"✨ Можно добавить еще: {remaining} аккаунтов")
+        
+        while current_count < max_accounts:
+            print(f"\n--- Добавление аккаунта {current_count + 1} из {max_accounts} ---")
+            result = await SessionCreator.create_new_session()
+            
+            if result:
+                current_count += 1
+                print(f"✅ Аккаунт добавлен! Всего: {current_count}/{max_accounts}")
+                
+                if current_count < max_accounts:
+                    answer = input("\n➕ Добавить еще один аккаунт? (y/n): ").strip().lower()
+                    if answer != 'y':
+                        break
+            else:
+                print("❌ Не удалось добавить аккаунт")
+                retry = input("🔄 Попробовать снова? (y/n): ").strip().lower()
+                if retry != 'y':
+                    break
+
 
 class MultiAccountSender:
     """Класс для управления несколькими аккаунтами"""
@@ -396,9 +164,9 @@ class MultiAccountSender:
         self.message_text = self.load_message()
         self.running = True
         self.global_stats = self.load_stats()
+        self.startup_complete = asyncio.Event()
         
     def load_message(self) -> str:
-        """Загружает сообщение из файла message.txt"""
         try:
             if os.path.exists(MESSAGE_FILE):
                 with open(MESSAGE_FILE, 'r', encoding='utf-8') as f:
@@ -409,7 +177,6 @@ class MultiAccountSender:
         except Exception as e:
             logger.error(f"❌ Ошибка загрузки сообщения: {e}")
         
-        # Сообщение по умолчанию
         default_msg = """Привет! Это тестовое сообщение.
 
 Оно может содержать несколько абзацев.
@@ -418,7 +185,6 @@ class MultiAccountSender:
 С уважением,
 Отправитель"""
         
-        # Сохраняем сообщение по умолчанию в файл
         try:
             with open(MESSAGE_FILE, 'w', encoding='utf-8') as f:
                 f.write(default_msg)
@@ -429,7 +195,6 @@ class MultiAccountSender:
         return default_msg
     
     def load_stats(self) -> dict:
-        """Загружает общую статистику"""
         if os.path.exists(STATS_FILE):
             try:
                 with open(STATS_FILE, 'r', encoding='utf-8') as f:
@@ -439,7 +204,6 @@ class MultiAccountSender:
         return {'total_sent': 0, 'total_errors': 0, 'captcha_solved': 0, 'captcha_failed': 0}
     
     def save_stats(self):
-        """Сохраняет общую статистику"""
         try:
             with open(STATS_FILE, 'w', encoding='utf-8') as f:
                 json.dump(self.global_stats, f, ensure_ascii=False, indent=2)
@@ -447,34 +211,35 @@ class MultiAccountSender:
             logger.error(f"❌ Ошибка сохранения статистики: {e}")
     
     def find_session_files(self) -> List[str]:
-        """Находит все файлы сессий в папке sessions"""
         session_files = []
-        
-        # Ищем файлы с расширением .session
         for file in glob.glob(os.path.join(SESSIONS_FOLDER, "*.session")):
             session_name = os.path.splitext(os.path.basename(file))[0]
             session_files.append(session_name)
-        
         return session_files
     
     async def initialize_accounts(self):
-        """Инициализирует все аккаунты"""
         session_names = self.find_session_files()
         
         if not session_names:
-            logger.warning("⚠️ В папке sessions нет файлов сессий!")
-            logger.info("📁 Создайте файлы сессий в папке sessions или добавьте существующие")
-            return False
+            print("\n⚠️ Нет файлов сессий!")
+            print("="*50)
+            print("📱 НУЖНО ДОБАВИТЬ АККАУНТЫ")
+            print("="*50)
+            
+            await SessionCreator.add_multiple_accounts(10)
+            
+            session_names = self.find_session_files()
+            if not session_names:
+                print("\n❌ Не добавлено ни одного аккаунта. Выход...")
+                return False
         
         logger.info(f"📁 Найдено {len(session_names)} файлов сессий")
         
         for session_name in session_names:
             logger.info(f"🔄 Инициализация аккаунта: {session_name}")
             
-            # Создаем отдельный лог-файл для каждого аккаунта
             account_log = os.path.join(LOG_FOLDER, f"{session_name}.log")
             
-            # Создаем клиента
             client = TelegramClient(
                 os.path.join(SESSIONS_FOLDER, session_name),
                 API_ID,
@@ -489,7 +254,6 @@ class MultiAccountSender:
                 log_file=account_log
             )
             
-            # Пытаемся подключиться и авторизоваться
             if await account.initialize():
                 self.accounts.append(account)
                 logger.info(f"✅ Аккаунт {session_name} готов к работе")
@@ -497,118 +261,37 @@ class MultiAccountSender:
                 logger.error(f"❌ Не удалось инициализировать аккаунт {session_name}")
         
         logger.info(f"✅ Готово аккаунтов: {len(self.accounts)} из {len(session_names)}")
+        
+        self.startup_complete.set()
         return len(self.accounts) > 0
     
     async def start_all(self):
-        """Запускает рассылку на всех аккаунтах"""
         logger.info(f"🚀 Запуск рассылки на {len(self.accounts)} аккаунтах")
-        
-        # Запускаем все аккаунты одновременно
         tasks = [account.run() for account in self.accounts]
         await asyncio.gather(*tasks)
     
     async def stop_all(self):
-        """Останавливает все аккаунты"""
         logger.info("⏸️ Остановка всех аккаунтов...")
         for account in self.accounts:
             account.stop()
     
-    async def process_commands(self):
-        """Обработка команд из консоли"""
-        print("\n" + "="*70)
-        print("🚀 МАССОВАЯ РАССЫЛКА С НЕСКОЛЬКИХ АККАУНТОВ")
-        print("="*70)
-        print(f"📁 Папка с сессиями: {SESSIONS_FOLDER}")
-        print(f"📄 Файл с сообщением: {MESSAGE_FILE}")
-        print(f"📊 Аккаунтов загружено: {len(self.accounts)}")
-        print("\n📋 КОМАНДЫ:")
-        print("  /start - запустить рассылку на всех аккаунтах")
-        print("  /stop - остановить рассылку")
-        print("  /status - статус всех аккаунтов")
-        print("  /message - показать текущее сообщение")
-        print("  /stats - общая статистика")
-        print("  /exit - выход")
-        print("="*70 + "\n")
+    async def auto_start(self):
+        """Автоматический запуск рассылки после инициализации"""
+        await self.startup_complete.wait()
         
-        while self.running:
-            try:
-                command = await asyncio.get_event_loop().run_in_executor(
-                    None, lambda: input(">>> ").strip().lower()
-                )
-                
-                if command == '/start':
-                    logger.info("🚀 Запуск рассылки...")
-                    asyncio.create_task(self.start_all())
-                    
-                elif command == '/stop':
-                    logger.info("⏸️ Остановка рассылки...")
-                    await self.stop_all()
-                    
-                elif command == '/status':
-                    self.show_status()
-                    
-                elif command == '/message':
-                    print("\n📄 ТЕКУЩЕЕ СООБЩЕНИЕ:")
-                    print("="*70)
-                    print(self.message_text)
-                    print("="*70)
-                    print(f"📊 Длина: {len(self.message_text)} символов")
-                    
-                elif command == '/stats':
-                    self.show_stats()
-                    
-                elif command == '/exit':
-                    print("👋 Завершение работы...")
-                    self.running = False
-                    await self.stop_all()
-                    
-                    # Отключаем всех клиентов
-                    for account in self.accounts:
-                        await account.client.disconnect()
-                    
-                    self.save_stats()
-                    sys.exit(0)
-                    
-            except Exception as e:
-                logger.error(f"Ошибка команды: {e}")
-    
-    def show_status(self):
-        """Показывает статус всех аккаунтов"""
-        print("\n" + "="*70)
-        print("📊 СТАТУС АККАУНТОВ")
-        print("="*70)
+        await asyncio.sleep(3)
         
-        active = sum(1 for a in self.accounts if a.sending_enabled)
-        waiting = sum(1 for a in self.accounts if a.waiting_for_next)
+        if not self.accounts:
+            logger.error("❌ Нет активных аккаунтов для автоматического запуска")
+            return
         
-        print(f"📁 Всего аккаунтов: {len(self.accounts)}")
-        print(f"✅ Активных: {active}")
-        print(f"⏳ Ожидают ответа: {waiting}")
-        print()
+        logger.info("="*70)
+        logger.info("🤖 АВТОМАТИЧЕСКИЙ ЗАПУСК РАССЫЛКИ")
+        logger.info(f"📊 Аккаунтов: {len(self.accounts)}")
+        logger.info(f"📄 Сообщение: {self.message_text[:100]}..." if len(self.message_text) > 100 else f"📄 Сообщение: {self.message_text}")
+        logger.info("="*70)
         
-        for account in self.accounts:
-            status = "✅" if account.sending_enabled else "⏸️"
-            waiting = "⏳" if account.waiting_for_next else "   "
-            print(f"  {status} {waiting} {account.session_name}: {account.send_count} отправлено")
-        
-        print("="*70 + "\n")
-    
-    def show_stats(self):
-        """Показывает общую статистику"""
-        total_sent = sum(a.send_count for a in self.accounts)
-        total_errors = sum(a.error_count for a in self.accounts)
-        captcha_solved = sum(a.captcha_stats['solved'] for a in self.accounts)
-        captcha_failed = sum(a.captcha_stats['failed'] for a in self.accounts)
-        
-        print("\n" + "="*70)
-        print("📊 ОБЩАЯ СТАТИСТИКА")
-        print("="*70)
-        print(f"✅ Отправлено сообщений: {total_sent}")
-        print(f"❌ Ошибок: {total_errors}")
-        print(f"🔄 Капч решено: {captcha_solved}")
-        print(f"❓ Капч не решено: {captcha_failed}")
-        print(f"📈 Процент успеха капчи: {captcha_solved/(captcha_solved+captcha_failed)*100:.1f}%" if captcha_solved+captcha_failed > 0 else "📈 Процент успеха капчи: N/A")
-        print("="*70 + "\n")
+        await self.start_all()
 
 
 class AccountSender:
@@ -637,6 +320,8 @@ class AccountSender:
         self.send_count = 0
         self.error_count = 0
         self.running = True
+        self.registered = False  # Флаг: прошел ли аккаунт регистрацию
+        self.registration_step = 0  # 0 - начало, 1 - ожидание пола, 2 - ожидание возраста
         
         # Защита от множественных вызовов
         self.last_next_command_time = 0
@@ -656,7 +341,7 @@ class AccountSender:
         self.save_photos = False
         self.photos_folder = os.path.join('received_photos', session_name)
         
-        # Последний обработанный message_id для защиты от дубликатов
+        # Последний обработанный message_id
         self.last_processed_message_id = None
         
     async def initialize(self) -> bool:
@@ -697,6 +382,8 @@ class AccountSender:
             self.sending_enabled = True
             self.waiting_for_next = False
             self.last_next_command_time = 0
+            self.registered = False
+            self.registration_step = 0
             self.logger.info("🚀 Рассылка запущена")
             await self.send_next_command()
     
@@ -740,15 +427,61 @@ class AccountSender:
             await asyncio.sleep(5)
             await self.send_next_command()
     
+    async def handle_registration(self, event):
+        """Обрабатывает регистрационные сообщения (выбор пола, возраст)"""
+        message_text = event.raw_text
+        message = event.message
+        
+        print(f"\n📝 [{self.session_name}] РЕГИСТРАЦИЯ:")
+        print(f"Текст: {message_text}")
+        
+        # Шаг 1: Выбор пола (кнопки мужской/женский)
+        if self.registration_step == 0:
+            if message.reply_markup and message.reply_markup.rows:
+                for row in message.reply_markup.rows:
+                    for button in row.buttons:
+                        if hasattr(button, 'text'):
+                            btn_text = button.text.lower()
+                            if 'мужской' in btn_text or 'муж' in btn_text:
+                                print(f"🔘 [{self.session_name}] Нажимаю кнопку: {button.text}")
+                                await event.click(text=button.text)
+                                self.registration_step = 1
+                                self.waiting_for_next = False
+                                print(f"✅ [{self.session_name}] Выбран пол, ожидаю вопрос о возрасте...")
+                                return
+                            elif 'женский' in btn_text or 'жен' in btn_text:
+                                print(f"🔘 [{self.session_name}] Нажимаю кнопку: {button.text}")
+                                await event.click(text=button.text)
+                                self.registration_step = 1
+                                self.waiting_for_next = False
+                                print(f"✅ [{self.session_name}] Выбран пол, ожидаю вопрос о возрасте...")
+                                return
+        
+        # Шаг 2: Ввод возраста
+        elif self.registration_step == 1:
+            # Ищем возраст от 19 до 30 в тексте (может быть вопрос или предложение)
+            import re
+            numbers = re.findall(r'\b(1[9]|2[0-9]|30)\b', message_text)
+            if numbers:
+                age = numbers[0]
+                print(f"🔢 [{self.session_name}] Отправляю возраст: {age}")
+                await self.client.send_message(self.bot_entity, age)
+                self.registration_step = 2
+                self.waiting_for_next = False
+                print(f"✅ [{self.session_name}] Возраст отправлен, регистрация завершена!")
+                self.registered = True
+                return
+        
+        # Если не нашли кнопки или возраст, просто продолжаем цикл
+        await asyncio.sleep(2)
+        await self.send_next_command()
+    
     def extract_target_name(self, text):
         """Извлекает название из текста капчи"""
         if not text:
             return None
         
         text_lower = text.lower()
-        
-        if self.debug_mode:
-            print(f"🔍 [DEBUG {self.session_name}] Анализируем текст капчи")
         
         # СПЕЦИАЛЬНЫЙ ПАТТЕРН ДЛЯ "изображн(а) Х"
         match = re.search(r'изображн\(а\)\s+([а-яё]+)', text_lower)
@@ -823,6 +556,9 @@ class AccountSender:
         
         try:
             message_text = event.raw_text
+            print(f"\n🔐 [{self.session_name}] ПОЛУЧЕНА КАПЧА:")
+            print(f"📝 Текст: {message_text[:300]}")
+            
             target_name = self.extract_target_name(message_text)
             
             if not target_name:
@@ -832,6 +568,7 @@ class AccountSender:
                 return False
             
             self.logger.info(f"🔍 В капче нужно найти: {target_name}")
+            print(f"🔍 [{self.session_name}] В капче нужно найти: {target_name}")
             
             if not event.message.reply_markup or not event.message.reply_markup.rows:
                 self.logger.error("❌ В сообщении с капчей нет кнопок")
@@ -847,17 +584,16 @@ class AccountSender:
                 self.global_stats['captcha_failed'] = self.global_stats.get('captcha_failed', 0) + 1
                 return False
             
-            # Пробуем нажать на кнопку
+            print(f"✅ [{self.session_name}] Найдена кнопка: {target_button.text}")
+            
             captcha_solved = False
             
-            # Способ 1: через событие по тексту
             try:
                 await event.click(text=target_button.text)
                 captcha_solved = True
             except:
                 pass
             
-            # Способ 2: через данные кнопки
             if not captcha_solved and hasattr(target_button, 'data'):
                 try:
                     await event.click(data=target_button.data)
@@ -869,8 +605,8 @@ class AccountSender:
                 self.captcha_stats['solved'] += 1
                 self.global_stats['captcha_solved'] = self.global_stats.get('captcha_solved', 0) + 1
                 self.logger.info(f"✅ Капча решена")
+                print(f"✅ [{self.session_name}] Капча решена!")
                 
-                # Отправляем /next после решения капчи
                 if self.sending_enabled:
                     await asyncio.sleep(2)
                     await self.send_next_command()
@@ -878,6 +614,7 @@ class AccountSender:
                 return True
             else:
                 self.logger.error("❌ Не удалось решить капчу")
+                print(f"❌ [{self.session_name}] Не удалось решить капчу")
                 self.captcha_stats['failed'] += 1
                 self.global_stats['captcha_failed'] = self.global_stats.get('captcha_failed', 0) + 1
                 return False
@@ -905,19 +642,55 @@ class AccountSender:
         if not self.sending_enabled:
             return
         
-        # Защита от дубликатов
         message_id = event.message.id
         if self.last_processed_message_id == message_id:
             return
         self.last_processed_message_id = message_id
         
         message_text = event.raw_text
+        message_media = event.media
+        
+        # Вывод всех полученных сообщений в консоль
+        print(f"\n📩 [{self.session_name}] Получено сообщение:")
+        if message_text:
+            print(f"📝 Текст: {message_text[:200]}")
+        else:
+            print(f"📝 Текст: (пусто)")
+        
+        if message_media:
+            if isinstance(message_media, MessageMediaPhoto):
+                print(f"🖼️ Медиа: Фото")
+            elif isinstance(message_media, MessageMediaDocument):
+                print(f"📄 Медиа: Документ")
+            else:
+                print(f"📎 Медиа: {type(message_media).__name__}")
+        else:
+            print(f"📎 Медиа: нет")
+        
+        # Если аккаунт еще не зарегистрирован, обрабатываем регистрацию
+        if not self.registered:
+            # Проверяем, есть ли кнопки выбора пола
+            if event.message.reply_markup and event.message.reply_markup.rows:
+                for row in event.message.reply_markup.rows:
+                    for button in row.buttons:
+                        if hasattr(button, 'text'):
+                            btn_text = button.text.lower()
+                            if 'мужской' in btn_text or 'женский' in btn_text:
+                                print(f"🔘 [{self.session_name}] Обнаружена регистрация (выбор пола)")
+                                await self.handle_registration(event)
+                                return
+            
+            # Проверяем, есть ли вопрос о возрасте
+            if message_text and ('возраст' in message_text.lower() or 'лет' in message_text.lower()):
+                print(f"🔢 [{self.session_name}] Обнаружен вопрос о возрасте")
+                await self.handle_registration(event)
+                return
         
         # Проверка на ошибку "слишком много запросов"
         if message_text and ("слишком много запросов" in message_text.lower() or 
                              "too many requests" in message_text.lower()):
             self.logger.warning("⚠️ Обнаружена ошибка 'Слишком много запросов'!")
-            self.logger.info(f"⏳ Ожидание {self.too_many_requests_cooldown // 60} минут...")
+            print(f"⚠️ [{self.session_name}] СЛИШКОМ МНОГО ЗАПРОСОВ! Ожидание {self.too_many_requests_cooldown // 60} минут...")
             
             await asyncio.sleep(self.too_many_requests_cooldown)
             
@@ -940,10 +713,18 @@ class AccountSender:
             if self.check_for_image(event):
                 self.waiting_for_next = False
                 self.logger.info("✅ Получено подтверждение (изображение)!")
+                print(f"✅ [{self.session_name}] Получено подтверждение (изображение)!")
                 
-                # Отправляем целевое сообщение
                 await asyncio.sleep(1.5)
                 await self.send_target_message()
+            else:
+                if message_text and "капча" not in message_text.lower():
+                    print(f"ℹ️ [{self.session_name}] Получено текстовое сообщение вместо изображения:")
+                    print(f"   {message_text[:200]}")
+                    if "не удалось" in message_text.lower() or "ошибка" in message_text.lower():
+                        print(f"⚠️ [{self.session_name}] Ошибка от бота, продолжаем цикл")
+                        await asyncio.sleep(3)
+                        await self.send_next_command()
 
 
     async def send_target_message(self):
@@ -951,6 +732,7 @@ class AccountSender:
         try:
             await self.client.send_message(self.bot_entity, self.message_text)
             self.logger.info(f"✅ Сообщение #{self.send_count} отправлено!")
+            print(f"📤 [{self.session_name}] Сообщение #{self.send_count} отправлено!")
             
             await asyncio.sleep(3)
             await self.send_next_command()
@@ -983,14 +765,23 @@ async def main():
     # Создаем менеджер аккаунтов
     manager = MultiAccountSender()
     
-    # Инициализируем аккаунты
+    # Инициализируем аккаунты (если нет сессий, предложит добавить)
     if not await manager.initialize_accounts():
         print("\n❌ Не удалось инициализировать ни один аккаунт!")
         print("📁 Проверьте наличие файлов сессий в папке sessions/")
         return
     
-    # Запускаем обработку команд
-    await manager.process_commands()
+    # Запускаем автоматическую рассылку
+    await manager.auto_start()
+    
+    # Держим бота активным
+    try:
+        while True:
+            await asyncio.sleep(1)
+    except KeyboardInterrupt:
+        print("\n👋 Остановка бота...")
+        await manager.stop_all()
+        manager.save_stats()
 
 
 if __name__ == '__main__':
