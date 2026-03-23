@@ -1,42 +1,53 @@
 import asyncio
 import os
+import glob
 from telethon import TelegramClient
 
 API_ID = 25046122
 API_HASH = '58d3e0f528957980a6194874f2479304'
 BOT_USERNAME = '@MessageAnonBot'
-SESSION_NAME = 'sessions/17788323682'  # Используем рабочий аккаунт
 
 async def main():
-    # Используем существующий файл сессии
-    if not os.path.exists(f"{SESSION_NAME}.session"):
-        print(f"❌ Файл сессии не найден: {SESSION_NAME}.session")
-        print("Проверьте, что файл существует в папке sessions/")
+    # Находим все сессии
+    session_files = glob.glob("sessions/*.session")
+    
+    if not session_files:
+        print("❌ Нет файлов сессий в папке sessions/")
         return
     
-    client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
+    print("📁 Найдены сессии:")
+    for f in session_files:
+        print(f"   {f}")
+    
+    # Используем первую найденную сессию
+    session_path = session_files[0].replace('.session', '')
+    print(f"\n🔍 Использую сессию: {session_path}")
+    
+    client = TelegramClient(session_path, API_ID, API_HASH)
     await client.start()
     
     try:
+        me = await client.get_me()
+        print(f"✅ Аккаунт: {me.first_name} (ID: {me.id})")
+        
         bot = await client.get_entity(BOT_USERNAME)
-        print(f"✅ Бот найден!")
+        print(f"\n✅ Бот найден!")
         print(f"   ID: {bot.id}")
         print(f"   Username: {bot.username}")
         print(f"   Access Hash: {bot.access_hash}")
         
-        # Сохраняем ID для использования
+        # Сохраняем ID
         with open('bot_id.txt', 'w') as f:
             f.write(str(bot.id))
         print("\n✅ ID сохранен в bot_id.txt")
         
-        # Проверяем, что можем отправить сообщение
+        # Отправляем /start для проверки
         await client.send_message(bot, '/start')
         print("✅ Отправлен /start")
         
-        # Ждем ответ
         await asyncio.sleep(2)
         
-        # Получаем последнее сообщение от бота
+        # Получаем ответ
         async for msg in client.iter_messages(bot, limit=1):
             if msg.text:
                 print(f"📩 Ответ бота: {msg.text[:200]}")
