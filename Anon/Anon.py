@@ -54,12 +54,10 @@ os.makedirs(LOG_FOLDER, exist_ok=True)
 
 # ================== ПОЛНЫЙ СЛОВАРЬ ЭМОДЗИ ==================
 # (сохраните ваш существующий словарь EMOJI_DICT здесь)
-# Для краткости здесь только часть, но вы должны вставить свой полный словарь
 EMOJI_DICT = {
     'кот': ['🐱', '😺', '😸', '😻', '😽', '🙀', '😿', '😾', '🐈', '🐆'],
     'собака': ['🐶', '🐕', '🦮', '🐕‍🦺', '🐩'],
     'мышь': ['🐭', '🐁', '🐀'],
-    # ... остальной словарь
 }
 
 
@@ -437,31 +435,44 @@ class AccountSender:
         
         # Шаг 1: Выбор пола (кнопки мужской/женский)
         if self.registration_step == 0:
-            if message.reply_markup and message.reply_markup.rows:
-                for row in message.reply_markup.rows:
-                    for button in row.buttons:
-                        if hasattr(button, 'text'):
-                            btn_text = button.text.lower()
-                            if 'мужской' in btn_text or 'муж' in btn_text:
-                                print(f"🔘 [{self.session_name}] Нажимаю кнопку: {button.text}")
-                                await event.click(text=button.text)
-                                self.registration_step = 1
-                                self.waiting_for_next = False
-                                print(f"✅ [{self.session_name}] Выбран пол, ожидаю вопрос о возрасте...")
-                                return
-                            elif 'женский' in btn_text or 'жен' in btn_text:
-                                print(f"🔘 [{self.session_name}] Нажимаю кнопку: {button.text}")
-                                await event.click(text=button.text)
-                                self.registration_step = 1
-                                self.waiting_for_next = False
-                                print(f"✅ [{self.session_name}] Выбран пол, ожидаю вопрос о возрасте...")
-                                return
+            if message.reply_markup:
+                # Получаем кнопки из клавиатуры
+                buttons = []
+                if hasattr(message.reply_markup, 'rows'):
+                    # InlineKeyboardMarkup
+                    for row in message.reply_markup.rows:
+                        for button in row.buttons:
+                            if hasattr(button, 'text'):
+                                buttons.append(button)
+                elif hasattr(message.reply_markup, 'buttons'):
+                    # ReplyKeyboardMarkup
+                    for row in message.reply_markup.buttons:
+                        for button in row:
+                            if hasattr(button, 'text'):
+                                buttons.append(button)
+                
+                for button in buttons:
+                    btn_text = button.text.lower()
+                    if 'мужской' in btn_text or 'муж' in btn_text:
+                        print(f"🔘 [{self.session_name}] Нажимаю кнопку: {button.text}")
+                        await event.click(text=button.text)
+                        self.registration_step = 1
+                        self.waiting_for_next = False
+                        print(f"✅ [{self.session_name}] Выбран пол, ожидаю вопрос о возрасте...")
+                        return
+                    elif 'женский' in btn_text or 'жен' in btn_text:
+                        print(f"🔘 [{self.session_name}] Нажимаю кнопку: {button.text}")
+                        await event.click(text=button.text)
+                        self.registration_step = 1
+                        self.waiting_for_next = False
+                        print(f"✅ [{self.session_name}] Выбран пол, ожидаю вопрос о возрасте...")
+                        return
         
         # Шаг 2: Ввод возраста
         elif self.registration_step == 1:
-            # Ищем возраст от 19 до 30 в тексте (может быть вопрос или предложение)
+            # Ищем возраст от 18 до 99 в тексте (может быть вопрос или предложение)
             import re
-            numbers = re.findall(r'\b(1[9]|2[0-9]|30)\b', message_text)
+            numbers = re.findall(r'\b(1[8-9]|[2-9][0-9])\b', message_text)
             if numbers:
                 age = numbers[0]
                 print(f"🔢 [{self.session_name}] Отправляю возраст: {age}")
@@ -470,6 +481,9 @@ class AccountSender:
                 self.waiting_for_next = False
                 print(f"✅ [{self.session_name}] Возраст отправлен, регистрация завершена!")
                 self.registered = True
+                # После регистрации продолжаем цикл
+                await asyncio.sleep(2)
+                await self.send_next_command()
                 return
         
         # Если не нашли кнопки или возраст, просто продолжаем цикл
@@ -483,28 +497,24 @@ class AccountSender:
         
         text_lower = text.lower()
         
-        # СПЕЦИАЛЬНЫЙ ПАТТЕРН ДЛЯ "изображн(а) Х"
         match = re.search(r'изображн\(а\)\s+([а-яё]+)', text_lower)
         if match:
             found = match.group(1)
             found = re.sub(r'[.,!?:;()]', '', found)
             return found
         
-        # Паттерн для "изображен(а) Х"
         match = re.search(r'изображен\(а\)\s+([а-яё]+)', text_lower)
         if match:
             found = match.group(1)
             found = re.sub(r'[.,!?:;()]', '', found)
             return found
         
-        # Паттерн для "где Х"
         match = re.search(r'где\s+([а-яё]+)', text_lower)
         if match:
             found = match.group(1)
             found = re.sub(r'[.,!?:;()]', '', found)
             return found
         
-        # Если не нашли по паттернам, ищем просто слово после "кнопку"
         if 'нажми на кнопку' in text_lower:
             parts = text_lower.split('нажми на кнопку')
             if len(parts) > 1:
@@ -570,7 +580,7 @@ class AccountSender:
             self.logger.info(f"🔍 В капче нужно найти: {target_name}")
             print(f"🔍 [{self.session_name}] В капче нужно найти: {target_name}")
             
-            if not event.message.reply_markup or not event.message.reply_markup.rows:
+            if not event.message.reply_markup or not hasattr(event.message.reply_markup, 'rows'):
                 self.logger.error("❌ В сообщении с капчей нет кнопок")
                 self.captcha_stats['failed'] += 1
                 self.global_stats['captcha_failed'] = self.global_stats.get('captcha_failed', 0) + 1
@@ -669,19 +679,34 @@ class AccountSender:
         
         # Если аккаунт еще не зарегистрирован, обрабатываем регистрацию
         if not self.registered:
+            # Проверяем, есть ли inline-кнопки (ReplyKeyboardMarkup или InlineKeyboardMarkup)
+            has_buttons = False
+            button_texts = []
+            
+            if event.message.reply_markup:
+                if hasattr(event.message.reply_markup, 'rows'):
+                    # InlineKeyboardMarkup
+                    for row in event.message.reply_markup.rows:
+                        for button in row.buttons:
+                            if hasattr(button, 'text'):
+                                button_texts.append(button.text.lower())
+                                has_buttons = True
+                elif hasattr(event.message.reply_markup, 'buttons'):
+                    # ReplyKeyboardMarkup
+                    for row in event.message.reply_markup.buttons:
+                        for button in row:
+                            if hasattr(button, 'text'):
+                                button_texts.append(button.text.lower())
+                                has_buttons = True
+            
             # Проверяем, есть ли кнопки выбора пола
-            if event.message.reply_markup and event.message.reply_markup.rows:
-                for row in event.message.reply_markup.rows:
-                    for button in row.buttons:
-                        if hasattr(button, 'text'):
-                            btn_text = button.text.lower()
-                            if 'мужской' in btn_text or 'женский' in btn_text:
-                                print(f"🔘 [{self.session_name}] Обнаружена регистрация (выбор пола)")
-                                await self.handle_registration(event)
-                                return
+            if has_buttons and any('муж' in text or 'жен' in text for text in button_texts):
+                print(f"🔘 [{self.session_name}] Обнаружена регистрация (выбор пола)")
+                await self.handle_registration(event)
+                return
             
             # Проверяем, есть ли вопрос о возрасте
-            if message_text and ('возраст' in message_text.lower() or 'лет' in message_text.lower()):
+            if message_text and ('возраст' in message_text.lower() or 'лет' in message_text.lower() or 'от 18 до 99' in message_text.lower()):
                 print(f"🔢 [{self.session_name}] Обнаружен вопрос о возрасте")
                 await self.handle_registration(event)
                 return
@@ -704,7 +729,7 @@ class AccountSender:
                              "капча" in message_text.lower() or
                              "нажми на кнопку" in message_text):
             
-            if event.message.reply_markup and event.message.reply_markup.rows:
+            if event.message.reply_markup and hasattr(event.message.reply_markup, 'rows'):
                 self.logger.warning("⚠️ Обнаружена капча!")
                 await self.handle_captcha(event)
                 return
