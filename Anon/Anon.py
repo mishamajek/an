@@ -15,7 +15,7 @@ import glob
 
 from telethon import TelegramClient, events, functions
 from telethon.errors import FloodWaitError, SessionPasswordNeededError, PhoneCodeInvalidError, PhoneCodeExpiredError, PeerIdInvalidError
-from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument, KeyboardButtonCallback
+from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument, KeyboardButtonCallback, PeerUser
 from telethon.tl.custom import Message
 from telethon.tl.functions.messages import StartBotRequest
 from telethon.tl.functions.contacts import ResolveUsernameRequest
@@ -29,15 +29,25 @@ if sys.platform == 'win32':
 API_ID = 25046122
 API_HASH = '58d3e0f528957980a6194874f2479304'
 
-# ID бота
+# ID бота (получите его через get_bot_id.py)
+BOT_ID = None
 BOT_USERNAME = '@MessageAnonBot'
-BOT_USERNAME_WITHOUT_AT = 'MessageAnonBot'
 
 # Папки и файлы
 SESSIONS_FOLDER = 'sessions'
 MESSAGE_FILE = 'message.txt'
 LOG_FOLDER = 'logs'
 STATS_FILE = 'stats.json'
+BOT_ID_FILE = 'bot_id.txt'
+
+# Загружаем ID бота
+if os.path.exists(BOT_ID_FILE):
+    try:
+        with open(BOT_ID_FILE, 'r') as f:
+            BOT_ID = int(f.read().strip())
+            print(f"✅ Загружен ID бота: {BOT_ID}")
+    except:
+        pass
 
 # Настройка логирования
 logging.basicConfig(
@@ -58,11 +68,161 @@ os.makedirs(LOG_FOLDER, exist_ok=True)
 # ================== ПОЛНЫЙ СЛОВАРЬ ЭМОДЗИ ==================
 EMOJI_DICT = {
     'кот': ['🐱', '😺', '😸', '😻', '😽', '🙀', '😿', '😾', '🐈', '🐆'],
+    'котик': ['🐱', '😺', '😸', '😻', '😽', '🙀', '😿', '😾', '🐈', '🐆'],
+    'кошка': ['🐱', '😺', '😸', '😻', '😽', '🙀', '😿', '😾', '🐈', '🐆'],
     'собака': ['🐶', '🐕', '🦮', '🐕‍🦺', '🐩'],
+    'пес': ['🐶', '🐕', '🦮', '🐕‍🦺', '🐩'],
+    'пёс': ['🐶', '🐕', '🦮', '🐕‍🦺', '🐩'],
     'мышь': ['🐭', '🐁', '🐀'],
+    'мышка': ['🐭', '🐁', '🐀'],
+    'хомяк': ['🐹'],
+    'хомячок': ['🐹'],
+    'кролик': ['🐰', '🐇'],
+    'зайка': ['🐰', '🐇'],
+    'лиса': ['🦊'],
+    'лисичка': ['🦊'],
+    'медведь': ['🐻', '🐻‍❄️'],
+    'мишка': ['🐻', '🐻‍❄️'],
+    'панда': ['🐼'],
+    'коала': ['🐨'],
+    'тигр': ['🐯', '🐅'],
+    'лев': ['🦁', '🐆'],
+    'обезьяна': ['🐵', '🐒', '🙈', '🙉', '🙊'],
+    'слон': ['🐘'],
+    'слоник': ['🐘'],
+    'жираф': ['🦒'],
+    'зебра': ['🦓'],
+    'верблюд': ['🐫', '🐪'],
+    'лошадь': ['🐴', '🐎'],
+    'корова': ['🐮', '🐄', '🐂'],
+    'свинья': ['🐷', '🐖', '🐗'],
+    'коза': ['🐐'],
+    'овца': ['🐑'],
+    'курица': ['🐔', '🐓'],
+    'петух': ['🐓'],
+    'утка': ['🦆'],
+    'гусь': ['🦢'],
+    'лебедь': ['🦢'],
+    'птица': ['🐦', '🦅', '🦉', '🐧'],
+    'орёл': ['🦅'],
+    'сова': ['🦉'],
+    'пингвин': ['🐧'],
+    'рыба': ['🐟', '🐠', '🐡', '🐋', '🦈'],
+    'дельфин': ['🐬'],
+    'кит': ['🐋'],
+    'акула': ['🦈'],
     'змея': ['🐍'],
-    'птица': ['🐦', '🦅'],
-    'рыба': ['🐟', '🐠'],
+    'ящерица': ['🦎'],
+    'черепаха': ['🐢'],
+    'лягушка': ['🐸'],
+    'крокодил': ['🐊'],
+    'динозавр': ['🦕', '🦖'],
+    'паук': ['🕷️', '🕸️'],
+    'бабочка': ['🦋'],
+    'жук': ['🐞'],
+    'улитка': ['🐌'],
+    'яблоко': ['🍎', '🍏'],
+    'банан': ['🍌'],
+    'виноград': ['🍇'],
+    'арбуз': ['🍉'],
+    'клубника': ['🍓'],
+    'вишня': ['🍒'],
+    'персик': ['🍑'],
+    'груша': ['🍐'],
+    'лимон': ['🍋'],
+    'апельсин': ['🍊'],
+    'помидор': ['🍅'],
+    'огурец': ['🥒'],
+    'морковь': ['🥕'],
+    'картошка': ['🥔'],
+    'гриб': ['🍄'],
+    'хлеб': ['🍞'],
+    'сыр': ['🧀'],
+    'молоко': ['🥛'],
+    'яйцо': ['🥚'],
+    'пицца': ['🍕'],
+    'бургер': ['🍔'],
+    'хот-дог': ['🌭'],
+    'суши': ['🍣'],
+    'мороженое': ['🍦', '🍧', '🍨'],
+    'торт': ['🍰', '🎂'],
+    'пончик': ['🍩'],
+    'печенье': ['🍪'],
+    'шоколад': ['🍫'],
+    'конфета': ['🍬', '🍭'],
+    'кофе': ['☕', '🫖'],
+    'чай': ['🍵'],
+    'вода': ['💧', '🚰'],
+    'сок': ['🧃'],
+    'пиво': ['🍺', '🍻'],
+    'вино': ['🍷'],
+    'машина': ['🚗', '🚙', '🚕', '🚓', '🚑', '🚒', '🚌'],
+    'автобус': ['🚌', '🚎'],
+    'поезд': ['🚂', '🚆', '🚇'],
+    'самолёт': ['✈️', '🛩️', '🛫', '🛬'],
+    'вертолёт': ['🚁'],
+    'кораблик': ['🚢', '⛵', '🛥️'],
+    'велосипед': ['🚲', '🚴'],
+    'мотоцикл': ['🏍️'],
+    'футбол': ['⚽'],
+    'баскетбол': ['🏀'],
+    'теннис': ['🎾'],
+    'хоккей': ['🏒'],
+    'солнце': ['☀️', '☼'],
+    'луна': ['🌙', '🌚', '🌛', '🌜'],
+    'звезда': ['⭐', '🌟'],
+    'облако': ['☁️', '⛅'],
+    'дождь': ['🌧️', '☔'],
+    'снег': ['❄️', '🌨️', '☃️'],
+    'радуга': ['🌈'],
+    'ветер': ['💨'],
+    'флаг': ['🚩', '🎌'],
+    'россия': ['🇷🇺'],
+    'сша': ['🇺🇸'],
+    'улыбка': ['😊', '😃', '😄', '😁', '😆', '🙂', '😀'],
+    'грусть': ['😢', '😭', '😞', '😔', '😟'],
+    'гнев': ['😠', '😡', '🤬'],
+    'смех': ['😂', '🤣', '😆'],
+    'любовь': ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎'],
+    'сердце': ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎'],
+    'книга': ['📕', '📗', '📘', '📙', '📚', '📖'],
+    'телефон': ['📱', '📲', '📞', '☎️'],
+    'компьютер': ['💻', '🖥️'],
+    'деньги': ['💵', '💶', '💷', '💴', '💰', '💳'],
+    'ключ': ['🔑', '🗝️'],
+    'замок': ['🔒', '🔓'],
+    'лампа': ['💡'],
+    'огонь': ['🔥'],
+    'подарок': ['🎁'],
+    'музыка': ['🎵', '🎶', '🎼', '🎤', '🎧', '🎸', '🎹', '🎺', '🎻'],
+    'гитара': ['🎸'],
+    'пианино': ['🎹'],
+    'цветок': ['🌸', '🌺', '🌻', '🌼', '🌷', '💐', '🌹'],
+    'роза': ['🌹'],
+    'дерево': ['🌲', '🌳', '🌴'],
+    'трава': ['🌿', '☘️'],
+    'лист': ['🍃', '🍂', '🍁'],
+    'гора': ['⛰️', '🏔️'],
+    'вулкан': ['🌋'],
+    'океан': ['🌊'],
+    'волна': ['🌊'],
+    'планета': ['🌍', '🌎', '🌏', '🪐'],
+    'ракета': ['🚀'],
+    'спутник': ['🛰️'],
+    'нло': ['🛸'],
+    'знак вопроса': ['❓', '❔'],
+    'восклицательный знак': ['❗', '❕'],
+    'галочка': ['✅', '✔️', '☑️'],
+    'крестик': ['❌', '✖️', '❎'],
+    'стоп': ['🛑'],
+    'опасность': ['⚠️', '☢️', '☣️'],
+    'запрещено': ['🚫', '⛔'],
+    'инфо': ['ℹ️', '🛈'],
+    'лайк': ['👍', '❤️'],
+    'дизлайк': ['👎'],
+    'ок': ['👌', '🆗'],
+    'круто': ['🔥', '💯'],
+    'супер': ['🔥', '💯'],
 }
 
 
@@ -279,9 +439,7 @@ class MultiAccountSender:
             account.stop()
     
     async def auto_start(self):
-        """Автоматический запуск рассылки после инициализации"""
         await self.startup_complete.wait()
-        
         await asyncio.sleep(3)
         
         if not self.accounts:
@@ -291,7 +449,6 @@ class MultiAccountSender:
         logger.info("="*70)
         logger.info("🤖 АВТОМАТИЧЕСКИЙ ЗАПУСК РАССЫЛКИ")
         logger.info(f"📊 Аккаунтов: {len(self.accounts)}")
-        logger.info(f"📄 Сообщение: {self.message_text[:100]}..." if len(self.message_text) > 100 else f"📄 Сообщение: {self.message_text}")
         logger.info("="*70)
         
         await self.start_all()
@@ -307,18 +464,14 @@ class AccountSender:
         self.message_text = message_text
         self.global_stats = global_stats
         
-        # Настройка логирования для аккаунта
         self.logger = logging.getLogger(f"Account_{session_name}")
         self.logger.setLevel(logging.INFO)
         
-        # Добавляем файловый обработчик
         file_handler = logging.FileHandler(log_file, encoding='utf-8')
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         self.logger.addHandler(file_handler)
         
-        # Состояние аккаунта
         self.bot_entity = None
-        self.bot_peer = None
         self.waiting_for_next = False
         self.sending_enabled = False
         self.send_count = 0
@@ -328,29 +481,23 @@ class AccountSender:
         self.registration_step = 0
         self.reconnect_attempts = 0
         
-        # Защита от множественных вызовов
         self.last_next_command_time = 0
         self.next_command_cooldown = 5
         self.processing_captcha = False
         self.too_many_requests_cooldown = 300
         
-        # Статистика капчи
         self.captcha_stats = {
             'solved': 0,
             'failed': 0,
             'unknown': defaultdict(int)
         }
         
-        # Отладка
         self.debug_mode = True
         self.save_photos = False
         self.photos_folder = os.path.join('received_photos', session_name)
-        
-        # Последний обработанный message_id
         self.last_processed_message_id = None
         
     async def initialize(self) -> bool:
-        """Инициализация аккаунта"""
         try:
             await self.client.connect()
             
@@ -362,12 +509,8 @@ class AccountSender:
             if me:
                 self.logger.info(f"✅ Авторизован как: {me.first_name} (ID: {me.id})")
             
-            # Находим бота
-            if not await self.refresh_bot_entity():
-                self.logger.error("❌ Не удалось найти бота")
-                return False
+            await self.get_bot_entity()
             
-            # Регистрируем обработчик сообщений
             @self.client.on(events.NewMessage(chats=[self.bot_entity]))
             async def handler(event):
                 await self.handle_bot_message(event)
@@ -378,62 +521,41 @@ class AccountSender:
             self.logger.error(f"❌ Ошибка инициализации: {e}")
             return False
     
-    async def refresh_bot_entity(self):
-        """Обновляет сущность бота через диалоги (самый надежный способ)"""
+    async def get_bot_entity(self):
+        """Получает сущность бота через ID или username"""
+        global BOT_ID
+        
+        if BOT_ID:
+            try:
+                self.bot_entity = await self.client.get_entity(PeerUser(BOT_ID))
+                self.logger.info(f"✅ Бот найден по ID: {BOT_ID}")
+                return
+            except Exception as e:
+                self.logger.warning(f"Поиск по ID не сработал: {e}")
+        
+        try:
+            self.bot_entity = await self.client.get_entity('@MessageAnonBot')
+            self.logger.info(f"✅ Бот найден по username: @MessageAnonBot")
+            return
+        except Exception as e:
+            self.logger.warning(f"Поиск по username не сработал: {e}")
+        
         try:
             async for dialog in self.client.iter_dialogs():
                 if dialog.is_user and dialog.entity and hasattr(dialog.entity, 'username'):
                     username = dialog.entity.username or ''
                     if 'MessageAnonBot' in username or 'messageanon' in username.lower():
                         self.bot_entity = dialog.entity
-                        self.bot_peer = await self.client.get_input_entity(dialog.id)
-                        self.logger.info(f"✅ Бот найден в диалогах: {dialog.name} (@{username})")
-                        return True
+                        self.logger.info(f"✅ Бот найден в диалогах: {dialog.name}")
+                        return
         except Exception as e:
-            self.logger.warning(f"Поиск в диалогах: {e}")
+            self.logger.warning(f"Поиск в диалогах не сработал: {e}")
         
-        # Альтернативный способ: через get_entity
-        try:
-            self.bot_entity = await self.client.get_entity('@MessageAnonBot')
-            self.logger.info(f"✅ Бот найден через get_entity: @MessageAnonBot")
-            return True
-        except Exception as e:
-            self.logger.warning(f"get_entity не сработал: {e}")
-        
-        # Способ 3: через ResolveUsernameRequest
-        try:
-            result = await self.client(functions.contacts.ResolveUsernameRequest('MessageAnonBot'))
-            self.bot_entity = result.peer
-            self.logger.info(f"✅ Бот найден через ResolveUsername")
-            return True
-        except Exception as e:
-            self.logger.warning(f"ResolveUsername не сработал: {e}")
-        
-        self.logger.error("❌ Не удалось найти бота ни одним способом")
-        return False
-    
-    async def ensure_bot_entity(self):
-        """Проверяет и обновляет сущность бота"""
-        if self.bot_entity is None:
-            return await self.refresh_bot_entity()
-        
-        # Проверяем, что можем отправить сообщение
-        try:
-            await self.client.send_message(self.bot_entity, '/start')
-            return True
-        except PeerIdInvalidError:
-            self.logger.warning("Сущность бота устарела, обновляем...")
-            return await self.refresh_bot_entity()
-        except Exception as e:
-            error_str = str(e).lower()
-            if "not found" in error_str or "invalid" in error_str:
-                return await self.refresh_bot_entity()
-            return True
+        self.logger.error("❌ Не удалось найти бота")
     
     async def send_start_command(self):
-        """Отправляет команду /start для инициализации диалога"""
-        if not await self.ensure_bot_entity():
-            return False
+        if not self.bot_entity:
+            await self.get_bot_entity()
         
         try:
             await self.client.send_message(self.bot_entity, '/start')
@@ -444,7 +566,6 @@ class AccountSender:
             return False
     
     async def run(self):
-        """Запускает рассылку на аккаунте"""
         if not self.sending_enabled:
             self.sending_enabled = True
             self.waiting_for_next = False
@@ -453,28 +574,18 @@ class AccountSender:
             self.registration_step = 0
             self.reconnect_attempts = 0
             
-            # Отправляем /start для инициализации
             await self.send_start_command()
             
             self.logger.info("🚀 Рассылка запущена")
             await self.send_next_command()
     
     def stop(self):
-        """Останавливает рассылку на аккаунте"""
         self.sending_enabled = False
         self.waiting_for_next = False
         self.logger.info("⏸️ Рассылка остановлена")
     
     async def send_next_command(self):
-        """Отправка команды /next"""
-        if not self.sending_enabled:
-            return
-        
-        # Проверяем сущность бота
-        if not await self.ensure_bot_entity():
-            self.logger.error("Не удалось получить сущность бота, повторная попытка через 5 сек")
-            await asyncio.sleep(5)
-            await self.send_next_command()
+        if not self.sending_enabled or not self.bot_entity:
             return
         
         current_time = time.time()
@@ -502,20 +613,15 @@ class AccountSender:
             
         except PeerIdInvalidError:
             self.logger.warning("⚠️ Ошибка PeerIdInvalid, обновляем сущность бота...")
-            await self.refresh_bot_entity()
+            await self.get_bot_entity()
             await asyncio.sleep(2)
             await self.send_next_command()
             
         except Exception as e:
-            error_str = str(e).lower()
             self.logger.error(f"❌ Ошибка /next: {e}")
             self.error_count += 1
             self.global_stats['total_errors'] = self.global_stats.get('total_errors', 0) + 1
             self.reconnect_attempts += 1
-            
-            if "not found" in error_str or "invalid" in error_str:
-                self.logger.warning("Бот не найден, обновляем сущность...")
-                await self.refresh_bot_entity()
             
             if self.reconnect_attempts > 5:
                 self.logger.error("Слишком много ошибок, пауза 60 секунд...")
@@ -526,14 +632,12 @@ class AccountSender:
             await self.send_next_command()
     
     async def handle_registration(self, event):
-        """Обрабатывает регистрационные сообщения (выбор пола, возраст)"""
         message_text = event.raw_text
         message = event.message
         
         print(f"\n📝 [{self.session_name}] РЕГИСТРАЦИЯ:")
         print(f"Текст: {message_text}")
         
-        # Шаг 1: Выбор пола
         if self.registration_step == 0:
             if message.reply_markup:
                 buttons = []
@@ -565,7 +669,6 @@ class AccountSender:
                         print(f"✅ [{self.session_name}] Выбран пол, ожидаю вопрос о возрасте...")
                         return
         
-        # Шаг 2: Ввод возраста
         elif self.registration_step == 1:
             import re
             numbers = re.findall(r'\b(1[8-9]|[2-9][0-9])\b', message_text)
@@ -585,7 +688,6 @@ class AccountSender:
         await self.send_next_command()
     
     def extract_target_name(self, text):
-        """Извлекает название из текста капчи"""
         if not text:
             return None
         
@@ -622,7 +724,6 @@ class AccountSender:
         return None
     
     def find_emoji_button(self, rows, target_name):
-        """Ищет кнопку по названию"""
         if not target_name:
             return None
         
@@ -652,7 +753,6 @@ class AccountSender:
         return None
     
     async def handle_captcha(self, event):
-        """Обрабатывает капчу"""
         if self.processing_captcha:
             return False
         
@@ -727,7 +827,6 @@ class AccountSender:
             self.processing_captcha = False
     
     def check_for_image(self, event):
-        """Проверяет, содержит ли сообщение изображение"""
         if not event.media:
             return False
             
@@ -742,7 +841,6 @@ class AccountSender:
         return False
     
     async def handle_bot_message(self, event):
-        """Обработка сообщений от бота"""
         if not self.sending_enabled:
             return
         
@@ -770,7 +868,6 @@ class AccountSender:
         else:
             print(f"📎 Медиа: нет")
         
-        # Если аккаунт еще не зарегистрирован, обрабатываем регистрацию
         if not self.registered:
             has_buttons = False
             button_texts = []
@@ -799,24 +896,18 @@ class AccountSender:
                 await self.handle_registration(event)
                 return
         
-        # Проверка на ошибку "слишком много запросов"
         if message_text and ("слишком много запросов" in message_text.lower() or 
                              "too many requests" in message_text.lower()):
             self.logger.warning("⚠️ Обнаружена ошибка 'Слишком много запросов'!")
             print(f"⚠️ [{self.session_name}] СЛИШКОМ МНОГО ЗАПРОСОВ! Ожидание {self.too_many_requests_cooldown // 60} минут...")
-            
             await asyncio.sleep(self.too_many_requests_cooldown)
-            
             if self.sending_enabled:
                 await self.send_next_command()
-            
             return
         
-        # Обработка капчи
         if message_text and ("проверку на робота" in message_text or 
                              "капча" in message_text.lower() or
                              "нажми на кнопку" in message_text):
-            
             if event.message.reply_markup and hasattr(event.message.reply_markup, 'rows'):
                 self.logger.warning("⚠️ Обнаружена капча!")
                 await self.handle_captcha(event)
@@ -827,7 +918,6 @@ class AccountSender:
                 self.waiting_for_next = False
                 self.logger.info("✅ Получено подтверждение (изображение)!")
                 print(f"✅ [{self.session_name}] Получено подтверждение (изображение)!")
-                
                 await asyncio.sleep(1.5)
                 await self.send_target_message()
             else:
@@ -839,10 +929,7 @@ class AccountSender:
                         await asyncio.sleep(3)
                         await self.send_next_command()
 
-
     async def send_target_message(self):
-        """Отправка целевого сообщения"""
-        # Проверяем сущность бота
         if not await self.ensure_bot_entity():
             self.logger.error("Не удалось получить сущность бота, пропускаем отправку")
             await asyncio.sleep(5)
@@ -853,7 +940,6 @@ class AccountSender:
             await self.client.send_message(self.bot_entity, self.message_text)
             self.logger.info(f"✅ Сообщение #{self.send_count} отправлено!")
             print(f"📤 [{self.session_name}] Сообщение #{self.send_count} отправлено!")
-            
             await asyncio.sleep(3)
             await self.send_next_command()
             
@@ -867,26 +953,25 @@ class AccountSender:
             
         except PeerIdInvalidError:
             self.logger.warning("⚠️ Ошибка PeerIdInvalid, обновляем сущность бота...")
-            await self.refresh_bot_entity()
+            await self.get_bot_entity()
             await asyncio.sleep(2)
             await self.send_target_message()
             
         except Exception as e:
-            error_str = str(e).lower()
             self.logger.error(f"❌ Ошибка отправки: {e}")
             self.error_count += 1
             self.global_stats['total_errors'] = self.global_stats.get('total_errors', 0) + 1
-            
-            if "not found" in error_str or "invalid" in error_str:
-                self.logger.warning("Бот не найден, обновляем сущность...")
-                await self.refresh_bot_entity()
-            
             await asyncio.sleep(5)
             await self.send_next_command()
+    
+    async def ensure_bot_entity(self):
+        if self.bot_entity is None:
+            await self.get_bot_entity()
+            return self.bot_entity is not None
+        return True
 
 
 async def main():
-    """Главная функция"""
     print("\n" + "="*70)
     print("🚀 МАССОВАЯ РАССЫЛКА В TELEGRAM")
     print("="*70)
