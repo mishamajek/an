@@ -7,59 +7,47 @@ from telethon.tl.functions.contacts import ResolveUsernameRequest
 
 API_ID = 25046122
 API_HASH = '58d3e0f528957980a6194874f2479304'
-BOT_USERNAME = '@MessageAnonBot'
-BOT_USERNAME_WITHOUT_AT = 'MessageAnonBot'
 SESSIONS_FOLDER = 'sessions'
 
 # Настройки регистрации
 GENDER = 'Мужской'  # или 'Женский'
 AGE = '25'  # от 18 до 99
 
-async def find_bot(client):
-    """Находит бота несколькими способами"""
-    
-    # Способ 1: через get_entity
-    try:
-        bot = await client.get_entity('@MessageAnonBot')
-        print(f"✅ Бот найден через get_entity")
-        return bot
-    except Exception as e:
-        pass
-    
-    # Способ 2: через ResolveUsernameRequest
-    try:
-        result = await client(ResolveUsernameRequest('MessageAnonBot'))
-        bot = result.peer
-        print(f"✅ Бот найден через ResolveUsername")
-        return bot
-    except Exception as e:
-        pass
-    
-    # Способ 3: поиск в диалогах
+async def find_bot_in_dialogs(client):
+    """Находит бота через диалоги (самый надежный способ)"""
     try:
         async for dialog in client.iter_dialogs():
             if dialog.is_user and dialog.entity and hasattr(dialog.entity, 'username'):
                 username = dialog.entity.username or ''
-                if 'MessageAnonBot' in username or 'messageanon' in username.lower():
-                    print(f"✅ Бот найден в диалогах: @{username}")
+                # Проверяем разные варианты имени
+                if 'MessageAnonBot' in username or 'messageanon' in username.lower() or 'Анонимный чат' in str(dialog.name):
+                    print(f"✅ Бот найден в диалогах: {dialog.name} (@{username})")
                     return dialog.entity
     except Exception as e:
-        pass
-    
-    # Способ 4: через get_input_entity
-    try:
-        bot = await client.get_input_entity('MessageAnonBot')
-        print(f"✅ Бот найден через get_input_entity")
-        return bot
-    except Exception as e:
-        pass
-    
+        print(f"Поиск в диалогах: {e}")
     return None
+
+async def send_message_to_bot(client, bot, text):
+    """Отправляет сообщение боту и ждет ответ"""
+    try:
+        await client.send_message(bot, text)
+        print(f"📤 Отправлено: {text}")
+        await asyncio.sleep(2)
+        
+        # Получаем последний ответ
+        async for msg in client.iter_messages(bot, limit=1):
+            if msg.text and msg.out is False:  # Входящее сообщение
+                print(f"📩 Ответ: {msg.text[:200]}")
+                return msg
+        return None
+    except Exception as e:
+        print(f"Ошибка отправки: {e}")
+        return None
 
 async def register_account(session_path):
     """Регистрирует аккаунт в боте"""
     try:
-        print(f"🔄 Регистрация: {os.path.basename(session_path)}")
+        print(f"\n🔄 Регистрация: {os.path.basename(session_path)}")
         
         client = TelegramClient(session_path, API_ID, API_HASH)
         await client.connect()
@@ -71,55 +59,44 @@ async def register_account(session_path):
         me = await client.get_me()
         print(f"✅ Аккаунт: {me.first_name} (ID: {me.id})")
         
-        # Находим бота
-        bot = await find_bot(client)
+        # Находим бота через диалоги (уже есть диалог!)
+        bot = await find_bot_in_dialogs(client)
         
         if not bot:
-            print(f"❌ Бот не найден")
+            print(f"❌ Бот не найден в диалогах")
             return False
         
-        print(f"✅ Бот найден")
+        print(f"✅ Бот найден, отправляем /start...")
         
-        # Отправляем /start
-        await client.send_message(bot, '/start')
-        print(f"📤 Отправлен /start")
+        # Отправляем /start и ждем ответ
+        msg = await send_message_to_bot(client, bot, '/start')
         
-        # Ждем ответ
-        await asyncio.sleep(3)
+        if not msg:
+            print(f"❌ Нет ответа на /start")
+            return False
         
-        # Получаем последнее сообщение
-        async for msg in client.iter_messages(bot, limit=1):
-            if msg.text:
-                print(f"📩 Ответ бота: {msg.text[:200]}")
-                
-                # Проверяем, есть ли кнопки
-                if msg.reply_markup:
-                    print("🔘 Найдены кнопки!")
-                    for row in msg.reply_markup.rows:
-                        for button in row.buttons:
-                            if hasattr(button, 'text'):
-                                btn_text = button.text
-                                print(f"   Кнопка: {btn_text}")
+        # Проверяем, нужно ли проходить регистрацию
+        if 'пол' in msg.text.lower() or 'регистрация' in msg.text.lower():
+            print("🔘 Начинаем регистрацию...")
+            
+            # Ищем кнопки
+            if msg.reply_markup:
+                for row in msg.reply_markup.rows:
+                    for button in row.buttons:
+                        if hasattr(button, 'text'):
+                            btn_text = button.text
+                            if GENDER in btn_text:
+                                print(f"🔘 Нажимаем кнопку: {btn_text}")
+                                await msg.click(text=btn_text)
+                                await asyncio.sleep(2)
                                 
-                                # Ищем кнопку с выбранным полом
-                                if GENDER in btn_text:
-                                    await msg.click(text=btn_text)
-                                    print(f"✅ Нажата кнопка: {btn_text}")
-                                    await asyncio.sleep(2)
-                                    
-                                    # Отправляем возраст
-                                    await client.send_message(bot, AGE)
-                                    print(f"✅ Отправлен возраст: {AGE}")
-                                    await asyncio.sleep(2)
-                                    return True
-                else:
-                    # Если нет кнопок, возможно вопрос о возрасте
-                    if 'возраст' in msg.text.lower() or 'лет' in msg.text.lower():
-                        await client.send_message(bot, AGE)
-                        print(f"✅ Отправлен возраст: {AGE}")
-                        await asyncio.sleep(2)
-                        return True
-        return False
+                                # Отправляем возраст
+                                await send_message_to_bot(client, bot, AGE)
+                                print(f"✅ Регистрация завершена!")
+                                return True
+        
+        print(f"✅ Аккаунт уже зарегистрирован")
+        return True
         
     except Exception as e:
         print(f"❌ Ошибка: {e}")
@@ -127,45 +104,11 @@ async def register_account(session_path):
     finally:
         await client.disconnect()
 
-async def check_bot_exists():
-    """Проверяет, существует ли бот в принципе"""
-    try:
-        from telethon import TelegramClient
-        import asyncio
-        
-        # Создаем временную сессию
-        client = TelegramClient('temp', API_ID, API_HASH)
-        await client.connect()
-        
-        # Проверяем существование бота
-        try:
-            bot = await client.get_entity('@MessageAnonBot')
-            print(f"✅ Бот @MessageAnonBot существует! ID: {bot.id}")
-            return True
-        except Exception as e:
-            print(f"❌ Бот @MessageAnonBot НЕ существует: {e}")
-            return False
-        finally:
-            await client.disconnect()
-    except Exception as e:
-        print(f"Ошибка проверки: {e}")
-        return False
-
 async def main():
     print("="*60)
     print("🚀 АВТОМАТИЧЕСКАЯ РЕГИСТРАЦИЯ В БОТЕ")
     print("="*60)
-    
-    # Сначала проверяем, существует ли бот
-    print("\n🔍 Проверка существования бота...")
-    bot_exists = await check_bot_exists()
-    
-    if not bot_exists:
-        print("\n❌ Бот @MessageAnonBot не существует!")
-        print("Проверьте правильность username бота.")
-        return
-    
-    print(f"\n📋 Настройки регистрации:")
+    print(f"📋 Настройки регистрации:")
     print(f"   Пол: {GENDER}")
     print(f"   Возраст: {AGE}")
     print("="*60)
@@ -180,10 +123,9 @@ async def main():
     
     success = 0
     for session_file in session_files:
-        print("-"*50)
         if await register_account(session_file):
             success += 1
-        print()
+        print("-"*50)
     
     print("="*60)
     print(f"✅ Зарегистрировано аккаунтов: {success}/{len(session_files)}")
