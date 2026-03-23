@@ -14,9 +14,10 @@ from typing import List, Dict, Optional
 import glob
 
 from telethon import TelegramClient, events, functions
-from telethon.errors import FloodWaitError, SessionPasswordNeededError, PhoneCodeInvalidError, PhoneCodeExpiredError
+from telethon.errors import FloodWaitError, SessionPasswordNeededError, PhoneCodeInvalidError, PhoneCodeExpiredError, PeerIdInvalidError
 from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument, KeyboardButtonCallback
 from telethon.tl.custom import Message
+from telethon.tl.functions.messages import StartBotRequest
 
 # Фикс для отображения эмодзи в Windows консоли
 if sys.platform == 'win32':
@@ -58,6 +59,9 @@ EMOJI_DICT = {
     'кот': ['🐱', '😺', '😸', '😻', '😽', '🙀', '😿', '😾', '🐈', '🐆'],
     'собака': ['🐶', '🐕', '🦮', '🐕‍🦺', '🐩'],
     'мышь': ['🐭', '🐁', '🐀'],
+    'змея': ['🐍'],
+    'птица': ['🐦', '🦅'],
+    'рыба': ['🐟', '🐠'],
 }
 
 
@@ -318,8 +322,8 @@ class AccountSender:
         self.send_count = 0
         self.error_count = 0
         self.running = True
-        self.registered = False  # Флаг: прошел ли аккаунт регистрацию
-        self.registration_step = 0  # 0 - начало, 1 - ожидание пола, 2 - ожидание возраста
+        self.registered = False
+        self.registration_step = 0
         
         # Защита от множественных вызовов
         self.last_next_command_time = 0
@@ -374,6 +378,15 @@ class AccountSender:
             self.logger.error(f"❌ Ошибка инициализации: {e}")
             return False
     
+    async def ensure_bot_entity(self):
+        """Обновляет сущность бота, если нужно"""
+        try:
+            self.bot_entity = await self.client.get_input_entity(BOT_USERNAME)
+            return True
+        except Exception as e:
+            self.logger.error(f"Ошибка обновления сущности бота: {e}")
+            return False
+    
     async def run(self):
         """Запускает рассылку на аккаунте"""
         if not self.sending_enabled:
@@ -395,6 +408,9 @@ class AccountSender:
         """Отправка команды /next"""
         if not self.sending_enabled:
             return
+        
+        # Обновляем сущность бота перед отправкой
+        await self.ensure_bot_entity()
         
         current_time = time.time()
         time_since_last = current_time - self.last_next_command_time
@@ -418,6 +434,12 @@ class AccountSender:
             await asyncio.sleep(wait_time)
             await self.send_next_command()
             
+        except PeerIdInvalidError:
+            self.logger.warning("⚠️ Ошибка PeerIdInvalid, обновляем сущность бота...")
+            await self.ensure_bot_entity()
+            await asyncio.sleep(1)
+            await self.send_next_command()
+            
         except Exception as e:
             self.logger.error(f"❌ Ошибка /next: {e}")
             self.error_count += 1
@@ -433,19 +455,16 @@ class AccountSender:
         print(f"\n📝 [{self.session_name}] РЕГИСТРАЦИЯ:")
         print(f"Текст: {message_text}")
         
-        # Шаг 1: Выбор пола (кнопки мужской/женский)
+        # Шаг 1: Выбор пола
         if self.registration_step == 0:
             if message.reply_markup:
-                # Получаем кнопки из клавиатуры
                 buttons = []
                 if hasattr(message.reply_markup, 'rows'):
-                    # InlineKeyboardMarkup
                     for row in message.reply_markup.rows:
                         for button in row.buttons:
                             if hasattr(button, 'text'):
                                 buttons.append(button)
                 elif hasattr(message.reply_markup, 'buttons'):
-                    # ReplyKeyboardMarkup
                     for row in message.reply_markup.buttons:
                         for button in row:
                             if hasattr(button, 'text'):
@@ -470,7 +489,6 @@ class AccountSender:
         
         # Шаг 2: Ввод возраста
         elif self.registration_step == 1:
-            # Ищем возраст от 18 до 99 в тексте (может быть вопрос или предложение)
             import re
             numbers = re.findall(r'\b(1[8-9]|[2-9][0-9])\b', message_text)
             if numbers:
@@ -481,12 +499,10 @@ class AccountSender:
                 self.waiting_for_next = False
                 print(f"✅ [{self.session_name}] Возраст отправлен, регистрация завершена!")
                 self.registered = True
-                # После регистрации продолжаем цикл
                 await asyncio.sleep(2)
                 await self.send_next_command()
                 return
         
-        # Если не нашли кнопки или возраст, просто продолжаем цикл
         await asyncio.sleep(2)
         await self.send_next_command()
     
@@ -660,7 +676,6 @@ class AccountSender:
         message_text = event.raw_text
         message_media = event.media
         
-        # Вывод всех полученных сообщений в консоль
         print(f"\n📩 [{self.session_name}] Получено сообщение:")
         if message_text:
             print(f"📝 Текст: {message_text[:200]}")
@@ -679,33 +694,28 @@ class AccountSender:
         
         # Если аккаунт еще не зарегистрирован, обрабатываем регистрацию
         if not self.registered:
-            # Проверяем, есть ли inline-кнопки (ReplyKeyboardMarkup или InlineKeyboardMarkup)
             has_buttons = False
             button_texts = []
             
             if event.message.reply_markup:
                 if hasattr(event.message.reply_markup, 'rows'):
-                    # InlineKeyboardMarkup
                     for row in event.message.reply_markup.rows:
                         for button in row.buttons:
                             if hasattr(button, 'text'):
                                 button_texts.append(button.text.lower())
                                 has_buttons = True
                 elif hasattr(event.message.reply_markup, 'buttons'):
-                    # ReplyKeyboardMarkup
                     for row in event.message.reply_markup.buttons:
                         for button in row:
                             if hasattr(button, 'text'):
                                 button_texts.append(button.text.lower())
                                 has_buttons = True
             
-            # Проверяем, есть ли кнопки выбора пола
             if has_buttons and any('муж' in text or 'жен' in text for text in button_texts):
                 print(f"🔘 [{self.session_name}] Обнаружена регистрация (выбор пола)")
                 await self.handle_registration(event)
                 return
             
-            # Проверяем, есть ли вопрос о возрасте
             if message_text and ('возраст' in message_text.lower() or 'лет' in message_text.lower() or 'от 18 до 99' in message_text.lower()):
                 print(f"🔢 [{self.session_name}] Обнаружен вопрос о возрасте")
                 await self.handle_registration(event)
@@ -754,6 +764,9 @@ class AccountSender:
 
     async def send_target_message(self):
         """Отправка целевого сообщения"""
+        # Обновляем сущность бота перед отправкой
+        await self.ensure_bot_entity()
+        
         try:
             await self.client.send_message(self.bot_entity, self.message_text)
             self.logger.info(f"✅ Сообщение #{self.send_count} отправлено!")
@@ -769,6 +782,12 @@ class AccountSender:
             self.global_stats['total_errors'] = self.global_stats.get('total_errors', 0) + 1
             await asyncio.sleep(wait_time)
             await self.send_next_command()
+            
+        except PeerIdInvalidError:
+            self.logger.warning("⚠️ Ошибка PeerIdInvalid, обновляем сущность бота...")
+            await self.ensure_bot_entity()
+            await asyncio.sleep(1)
+            await self.send_target_message()
             
         except Exception as e:
             self.logger.error(f"❌ Ошибка отправки: {e}")
@@ -787,19 +806,15 @@ async def main():
     print(f"📄 Файл с сообщением: {MESSAGE_FILE}")
     print("="*70 + "\n")
     
-    # Создаем менеджер аккаунтов
     manager = MultiAccountSender()
     
-    # Инициализируем аккаунты (если нет сессий, предложит добавить)
     if not await manager.initialize_accounts():
         print("\n❌ Не удалось инициализировать ни один аккаунт!")
         print("📁 Проверьте наличие файлов сессий в папке sessions/")
         return
     
-    # Запускаем автоматическую рассылку
     await manager.auto_start()
     
-    # Держим бота активным
     try:
         while True:
             await asyncio.sleep(1)
