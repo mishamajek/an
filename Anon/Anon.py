@@ -14,11 +14,8 @@ from typing import List, Dict, Optional
 import glob
 
 from telethon import TelegramClient, events, functions
-from telethon.errors import FloodWaitError, SessionPasswordNeededError, PhoneCodeInvalidError, PhoneCodeExpiredError, PeerIdInvalidError
-from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument, KeyboardButtonCallback, PeerUser
-from telethon.tl.custom import Message
-from telethon.tl.functions.messages import StartBotRequest
-from telethon.tl.functions.contacts import ResolveUsernameRequest
+from telethon.errors import FloodWaitError, SessionPasswordNeededError, PhoneCodeInvalidError, PhoneCodeExpiredError
+from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
 
 # Фикс для отображения эмодзи в Windows консоли
 if sys.platform == 'win32':
@@ -31,10 +28,9 @@ API_HASH = '58d3e0f528957980a6194874f2479304'
 
 # ID бота
 BOT_USERNAME = '@MessageAnonBot'
-BOT_USERNAME_WITHOUT_AT = 'MessageAnonBot'
 
 # Папки и файлы
-TDATA_FOLDER = 'tdata'  # Папка с tdata
+SESSIONS_FOLDER = 'sessions'
 MESSAGE_FILE = 'message.txt'
 LOG_FOLDER = 'logs'
 STATS_FILE = 'stats.json'
@@ -51,115 +47,116 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Создаем необходимые папки
-os.makedirs(TDATA_FOLDER, exist_ok=True)
+os.makedirs(SESSIONS_FOLDER, exist_ok=True)
 os.makedirs(LOG_FOLDER, exist_ok=True)
 
 
 # ================== ПОЛНЫЙ СЛОВАРЬ ЭМОДЗИ ==================
 EMOJI_DICT = {
     'кот': ['🐱', '😺', '😸', '😻', '😽', '🙀', '😿', '😾', '🐈', '🐆'],
-    'котик': ['🐱', '😺', '😸', '😻', '😽', '🙀', '😿', '😾', '🐈', '🐆'],
-    'кошка': ['🐱', '😺', '😸', '😻', '😽', '🙀', '😿', '😾', '🐈', '🐆'],
     'собака': ['🐶', '🐕', '🦮', '🐕‍🦺', '🐩'],
-    'пес': ['🐶', '🐕', '🦮', '🐕‍🦺', '🐩'],
-    'пёс': ['🐶', '🐕', '🦮', '🐕‍🦺', '🐩'],
     'мышь': ['🐭', '🐁', '🐀'],
-    'хомяк': ['🐹'],
-    'кролик': ['🐰', '🐇'],
-    'зайка': ['🐰', '🐇'],
-    'лиса': ['🦊'],
-    'медведь': ['🐻', '🐻‍❄️'],
-    'панда': ['🐼'],
-    'тигр': ['🐯', '🐅'],
-    'лев': ['🦁', '🐆'],
-    'обезьяна': ['🐵', '🐒', '🙈', '🙉', '🙊'],
-    'слон': ['🐘'],
-    'жираф': ['🦒'],
-    'лошадь': ['🐴', '🐎'],
-    'корова': ['🐮', '🐄', '🐂'],
-    'свинья': ['🐷', '🐖', '🐗'],
-    'коза': ['🐐'],
-    'овца': ['🐑'],
-    'курица': ['🐔', '🐓'],
-    'утка': ['🦆'],
-    'гусь': ['🦢'],
-    'птица': ['🐦', '🦅', '🦉', '🐧'],
-    'рыба': ['🐟', '🐠', '🐡', '🐋', '🦈'],
-    'дельфин': ['🐬'],
-    'кит': ['🐋'],
     'змея': ['🐍'],
-    'черепаха': ['🐢'],
-    'лягушка': ['🐸'],
-    'бабочка': ['🦋'],
-    'жук': ['🐞'],
-    'яблоко': ['🍎', '🍏'],
-    'банан': ['🍌'],
-    'виноград': ['🍇'],
-    'арбуз': ['🍉'],
-    'клубника': ['🍓'],
-    'вишня': ['🍒'],
-    'персик': ['🍑'],
-    'груша': ['🍐'],
-    'лимон': ['🍋'],
-    'апельсин': ['🍊'],
-    'помидор': ['🍅'],
-    'огурец': ['🥒'],
-    'морковь': ['🥕'],
-    'картошка': ['🥔'],
-    'гриб': ['🍄'],
-    'хлеб': ['🍞'],
-    'сыр': ['🧀'],
-    'молоко': ['🥛'],
-    'яйцо': ['🥚'],
-    'пицца': ['🍕'],
-    'бургер': ['🍔'],
-    'хот-дог': ['🌭'],
-    'мороженое': ['🍦', '🍧', '🍨'],
-    'торт': ['🍰', '🎂'],
-    'пончик': ['🍩'],
-    'печенье': ['🍪'],
-    'шоколад': ['🍫'],
-    'конфета': ['🍬', '🍭'],
-    'кофе': ['☕', '🫖'],
-    'чай': ['🍵'],
-    'вода': ['💧', '🚰'],
-    'сок': ['🧃'],
-    'пиво': ['🍺', '🍻'],
-    'вино': ['🍷'],
-    'машина': ['🚗', '🚙', '🚕', '🚓', '🚑', '🚒', '🚌'],
-    'автобус': ['🚌', '🚎'],
-    'поезд': ['🚂', '🚆', '🚇'],
-    'самолёт': ['✈️', '🛩️', '🛫', '🛬'],
-    'велосипед': ['🚲', '🚴'],
-    'солнце': ['☀️', '☼'],
-    'луна': ['🌙', '🌚', '🌛', '🌜'],
-    'звезда': ['⭐', '🌟'],
-    'облако': ['☁️', '⛅'],
-    'дождь': ['🌧️', '☔'],
-    'снег': ['❄️', '🌨️', '☃️'],
-    'радуга': ['🌈'],
-    'сердце': ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎'],
-    'телефон': ['📱', '📲', '📞', '☎️'],
-    'компьютер': ['💻', '🖥️'],
-    'деньги': ['💵', '💶', '💷', '💴', '💰', '💳'],
-    'ключ': ['🔑', '🗝️'],
-    'замок': ['🔒', '🔓'],
-    'подарок': ['🎁'],
-    'музыка': ['🎵', '🎶', '🎼', '🎤', '🎧', '🎸', '🎹', '🎺', '🎻'],
-    'цветок': ['🌸', '🌺', '🌻', '🌼', '🌷', '💐', '🌹'],
-    'роза': ['🌹'],
-    'дерево': ['🌲', '🌳', '🌴'],
-    'океан': ['🌊'],
-    'ракета': ['🚀'],
-    'галочка': ['✅', '✔️', '☑️'],
-    'крестик': ['❌', '✖️', '❎'],
-    'лайк': ['👍', '❤️'],
-    'дизлайк': ['👎'],
+    'птица': ['🐦', '🦅'],
+    'рыба': ['🐟', '🐠'],
 }
 
 
+class SessionCreator:
+    """Класс для создания новых сессий"""
+    
+    @staticmethod
+    async def create_new_session():
+        """Создает новую сессию через ввод номера и кода"""
+        print("\n" + "="*50)
+        print("📱 СОЗДАНИЕ НОВОЙ СЕССИИ")
+        print("="*50)
+        
+        phone = input("📞 Введите номер телефона в формате +71234567890: ").strip()
+        if not phone.startswith('+'):
+            phone = '+' + phone
+        
+        session_name = f"user_{phone.replace('+', '')}"
+        session_path = os.path.join(SESSIONS_FOLDER, session_name)
+        
+        print(f"🔄 Подключение к Telegram...")
+        
+        try:
+            client = TelegramClient(session_path, API_ID, API_HASH)
+            await client.connect()
+            
+            if await client.is_user_authorized():
+                print("✅ Аккаунт уже авторизован!")
+                await client.disconnect()
+                return session_name
+            
+            await client.send_code_request(phone)
+            print("📱 Код подтверждения отправлен!")
+            
+            code = input("🔢 Введите код из Telegram: ").strip().replace(' ', '').replace('-', '')
+            
+            try:
+                await client.sign_in(phone, code)
+                print("✅ Аккаунт успешно добавлен!")
+                await client.disconnect()
+                return session_name
+                
+            except SessionPasswordNeededError:
+                password = input("🔐 Введите пароль 2FA: ").strip()
+                await client.sign_in(password=password)
+                print("✅ Аккаунт успешно добавлен (с 2FA)!")
+                await client.disconnect()
+                return session_name
+                
+            except PhoneCodeInvalidError:
+                print("❌ Неверный код!")
+                await client.disconnect()
+                return None
+                
+        except FloodWaitError as e:
+            print(f"❌ Слишком много попыток. Подождите {e.seconds} секунд")
+            return None
+        except Exception as e:
+            print(f"❌ Ошибка: {e}")
+            return None
+    
+    @staticmethod
+    async def add_multiple_accounts(max_accounts=10):
+        """Добавляет несколько аккаунтов"""
+        existing_sessions = glob.glob(os.path.join(SESSIONS_FOLDER, "*.session"))
+        current_count = len(existing_sessions)
+        
+        print(f"\n📊 Текущее количество сессий: {current_count}")
+        print(f"📊 Максимум можно добавить: {max_accounts}")
+        
+        if current_count >= max_accounts:
+            print(f"✅ Уже достигнут лимит в {max_accounts} аккаунтов")
+            return
+        
+        remaining = max_accounts - current_count
+        print(f"✨ Можно добавить еще: {remaining} аккаунтов")
+        
+        while current_count < max_accounts:
+            print(f"\n--- Добавление аккаунта {current_count + 1} из {max_accounts} ---")
+            result = await SessionCreator.create_new_session()
+            
+            if result:
+                current_count += 1
+                print(f"✅ Аккаунт добавлен! Всего: {current_count}/{max_accounts}")
+                
+                if current_count < max_accounts:
+                    answer = input("\n➕ Добавить еще один аккаунт? (y/n): ").strip().lower()
+                    if answer != 'y':
+                        break
+            else:
+                print("❌ Не удалось добавить аккаунт")
+                retry = input("🔄 Попробовать снова? (y/n): ").strip().lower()
+                if retry != 'y':
+                    break
+
+
 class MultiAccountSender:
-    """Класс для управления несколькими аккаунтами через tdata"""
+    """Класс для управления несколькими аккаунтами"""
     
     def __init__(self):
         self.accounts: List['AccountSender'] = []
@@ -212,41 +209,44 @@ class MultiAccountSender:
         except Exception as e:
             logger.error(f"❌ Ошибка сохранения статистики: {e}")
     
-    def find_tdata_folders(self) -> List[str]:
-        """Находит все папки tdata"""
-        folders = []
-        if os.path.exists(TDATA_FOLDER):
-            for item in os.listdir(TDATA_FOLDER):
-                item_path = os.path.join(TDATA_FOLDER, item)
-                if os.path.isdir(item_path):
-                    folders.append(item)
-        return folders
+    def find_session_files(self) -> List[str]:
+        session_files = []
+        for file in glob.glob(os.path.join(SESSIONS_FOLDER, "*.session")):
+            session_name = os.path.splitext(os.path.basename(file))[0]
+            session_files.append(session_name)
+        return session_files
     
     async def initialize_accounts(self):
-        tdata_folders = self.find_tdata_folders()
+        session_names = self.find_session_files()
         
-        if not tdata_folders:
-            print("\n⚠️ Нет папок tdata!")
-            print("📁 Положите tdata папки в директорию tdata/")
-            print("   (скопируйте их с вашего компьютера через scp)")
-            return False
-        
-        logger.info(f"📁 Найдено tdata папок: {len(tdata_folders)}")
-        
-        for folder_name in tdata_folders:
-            logger.info(f"🔄 Инициализация аккаунта: {folder_name}")
+        if not session_names:
+            print("\n⚠️ Нет файлов сессий!")
+            print("="*50)
+            print("📱 НУЖНО ДОБАВИТЬ АККАУНТЫ")
+            print("="*50)
             
-            account_log = os.path.join(LOG_FOLDER, f"{folder_name}.log")
+            await SessionCreator.add_multiple_accounts(10)
             
-            # Используем tdata напрямую
+            session_names = self.find_session_files()
+            if not session_names:
+                print("\n❌ Не добавлено ни одного аккаунта. Выход...")
+                return False
+        
+        logger.info(f"📁 Найдено {len(session_names)} файлов сессий")
+        
+        for session_name in session_names:
+            logger.info(f"🔄 Инициализация аккаунта: {session_name}")
+            
+            account_log = os.path.join(LOG_FOLDER, f"{session_name}.log")
+            
             client = TelegramClient(
-                os.path.join(TDATA_FOLDER, folder_name),
+                os.path.join(SESSIONS_FOLDER, session_name),
                 API_ID,
                 API_HASH
             )
             
             account = AccountSender(
-                session_name=folder_name,
+                session_name=session_name,
                 client=client,
                 message_text=self.message_text,
                 global_stats=self.global_stats,
@@ -255,11 +255,11 @@ class MultiAccountSender:
             
             if await account.initialize():
                 self.accounts.append(account)
-                logger.info(f"✅ Аккаунт {folder_name} готов к работе")
+                logger.info(f"✅ Аккаунт {session_name} готов к работе")
             else:
-                logger.error(f"❌ Не удалось инициализировать аккаунт {folder_name}")
+                logger.error(f"❌ Не удалось инициализировать аккаунт {session_name}")
         
-        logger.info(f"✅ Готово аккаунтов: {len(self.accounts)} из {len(tdata_folders)}")
+        logger.info(f"✅ Готово аккаунтов: {len(self.accounts)} из {len(session_names)}")
         
         self.startup_complete.set()
         return len(self.accounts) > 0
@@ -291,7 +291,7 @@ class MultiAccountSender:
 
 
 class AccountSender:
-    """Класс для отдельного аккаунта с tdata"""
+    """Класс для отдельного аккаунта"""
     
     def __init__(self, session_name: str, client: TelegramClient, message_text: str, 
                  global_stats: dict, log_file: str):
@@ -300,39 +300,47 @@ class AccountSender:
         self.message_text = message_text
         self.global_stats = global_stats
         
+        # Настройка логирования для аккаунта
         self.logger = logging.getLogger(f"Account_{session_name}")
         self.logger.setLevel(logging.INFO)
         
+        # Добавляем файловый обработчик
         file_handler = logging.FileHandler(log_file, encoding='utf-8')
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         self.logger.addHandler(file_handler)
         
+        # Состояние аккаунта
         self.bot_entity = None
         self.waiting_for_next = False
         self.sending_enabled = False
         self.send_count = 0
         self.error_count = 0
         self.running = True
-        self.registered = False
-        self.registration_step = 0
         self.reconnect_attempts = 0
-        self.registration_complete = False
         
+        # Защита от множественных вызовов
         self.last_next_command_time = 0
         self.next_command_cooldown = 5
         self.processing_captcha = False
         self.too_many_requests_cooldown = 300
         
+        # Статистика капчи
         self.captcha_stats = {
             'solved': 0,
             'failed': 0,
             'unknown': defaultdict(int)
         }
         
+        # Отладка
         self.debug_mode = True
+        self.save_photos = False
+        self.photos_folder = os.path.join('received_photos', session_name)
+        
+        # Последний обработанный message_id
         self.last_processed_message_id = None
         
     async def initialize(self) -> bool:
+        """Инициализация аккаунта"""
         try:
             await self.client.connect()
             
@@ -345,14 +353,15 @@ class AccountSender:
                 self.logger.info(f"✅ Авторизован как: {me.first_name} (ID: {me.id})")
             
             # Находим бота
-            await self.get_bot_entity()
-            
-            if not self.bot_entity:
-                self.logger.error(f"❌ Бот {BOT_USERNAME} не найден")
+            try:
+                self.bot_entity = await self.client.get_input_entity(BOT_USERNAME)
+                self.logger.info(f"✅ Бот {BOT_USERNAME} найден")
+            except Exception as e:
+                self.logger.error(f"❌ Не удалось найти бота: {e}")
                 return False
             
             # Регистрируем обработчик сообщений
-            @self.client.on(events.NewMessage)
+            @self.client.on(events.NewMessage(chats=[self.bot_entity]))
             async def handler(event):
                 await self.handle_bot_message(event)
             
@@ -362,153 +371,24 @@ class AccountSender:
             self.logger.error(f"❌ Ошибка инициализации: {e}")
             return False
     
-    async def get_bot_entity(self):
-        """Находит бота через диалоги или поиск"""
-        try:
-            # Сначала ищем в диалогах
-            async for dialog in self.client.iter_dialogs():
-                if dialog.is_user and dialog.entity and hasattr(dialog.entity, 'username'):
-                    username = dialog.entity.username or ''
-                    if 'MessageAnonBot' in username or 'messageanon' in username.lower():
-                        self.bot_entity = dialog.entity
-                        self.logger.info(f"✅ Бот найден в диалогах: @{username}")
-                        return
-        except Exception as e:
-            self.logger.warning(f"Поиск в диалогах: {e}")
-        
-        # Пробуем найти через get_entity
-        try:
-            self.bot_entity = await self.client.get_entity(BOT_USERNAME)
-            self.logger.info(f"✅ Бот найден через get_entity")
-            return
-        except Exception as e:
-            self.logger.warning(f"get_entity не сработал: {e}")
-        
-        # Пробуем через ResolveUsername
-        try:
-            result = await self.client(functions.contacts.ResolveUsernameRequest(BOT_USERNAME_WITHOUT_AT))
-            self.bot_entity = result.peer
-            self.logger.info(f"✅ Бот найден через ResolveUsername")
-            return
-        except Exception as e:
-            self.logger.warning(f"ResolveUsername не сработал: {e}")
-        
-        self.logger.error("❌ Бот не найден")
-    
-    async def ensure_bot_entity(self):
-        if self.bot_entity is None:
-            await self.get_bot_entity()
-        return self.bot_entity is not None
-    
-    async def start_bot_dialog(self):
-        """Запускает диалог с ботом и проходит регистрацию"""
-        if not await self.ensure_bot_entity():
-            return False
-        
-        try:
-            # Отправляем /start
-            await self.client.send_message(self.bot_entity, '/start')
-            self.logger.info("📤 Отправлен /start")
-            await asyncio.sleep(2)
-            
-            # Получаем последнее сообщение
-            async for msg in self.client.iter_messages(self.bot_entity, limit=1):
-                if msg.text:
-                    self.logger.info(f"📩 Ответ бота: {msg.text[:100]}")
-                    
-                    # Проверяем, нужно ли проходить регистрацию
-                    if 'пол' in msg.text.lower() or 'регистрация' in msg.text.lower() or 'выбери' in msg.text.lower():
-                        self.logger.info("🔘 Начинаем регистрацию...")
-                        return await self.handle_registration_message(msg)
-                    else:
-                        self.logger.info("✅ Регистрация не требуется")
-                        self.registration_complete = True
-                        return True
-            
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Ошибка запуска диалога: {e}")
-            return False
-    
-    async def handle_registration_message(self, msg):
-        """Обрабатывает регистрационное сообщение"""
-        try:
-            message_text = msg.text
-            print(f"\n📝 [{self.session_name}] РЕГИСТРАЦИЯ:")
-            print(f"Текст: {message_text[:200]}")
-            
-            # Шаг 1: Выбор пола
-            if 'пол' in message_text.lower() or 'выбери' in message_text.lower():
-                if msg.reply_markup:
-                    for row in msg.reply_markup.rows:
-                        for button in row.buttons:
-                            if hasattr(button, 'text'):
-                                btn_text = button.text
-                                if 'мужской' in btn_text.lower() or 'муж' in btn_text.lower():
-                                    print(f"🔘 [{self.session_name}] Выбираю: {btn_text}")
-                                    await msg.click(text=btn_text)
-                                    await asyncio.sleep(2)
-                                    
-                                    # После выбора пола ждем вопрос о возрасте
-                                    async for new_msg in self.client.iter_messages(self.bot_entity, limit=1):
-                                        if new_msg.text and ('возраст' in new_msg.text.lower() or 'лет' in new_msg.text.lower()):
-                                            age = '25'  # Отправляем возраст
-                                            print(f"🔢 [{self.session_name}] Отправляю возраст: {age}")
-                                            await self.client.send_message(self.bot_entity, age)
-                                            await asyncio.sleep(2)
-                                            self.registration_complete = True
-                                            print(f"✅ [{self.session_name}] Регистрация завершена!")
-                                            return True
-                                    break
-                                elif 'женский' in btn_text.lower() or 'жен' in btn_text.lower():
-                                    print(f"🔘 [{self.session_name}] Выбираю: {btn_text}")
-                                    await msg.click(text=btn_text)
-                                    await asyncio.sleep(2)
-                                    
-                                    async for new_msg in self.client.iter_messages(self.bot_entity, limit=1):
-                                        if new_msg.text and ('возраст' in new_msg.text.lower() or 'лет' in new_msg.text.lower()):
-                                            age = '25'
-                                            print(f"🔢 [{self.session_name}] Отправляю возраст: {age}")
-                                            await self.client.send_message(self.bot_entity, age)
-                                            await asyncio.sleep(2)
-                                            self.registration_complete = True
-                                            print(f"✅ [{self.session_name}] Регистрация завершена!")
-                                            return True
-                                    break
-            
-            return False
-            
-        except Exception as e:
-            self.logger.error(f"Ошибка регистрации: {e}")
-            return False
-    
     async def run(self):
+        """Запускает рассылку на аккаунте"""
         if not self.sending_enabled:
             self.sending_enabled = True
             self.waiting_for_next = False
             self.last_next_command_time = 0
-            self.registration_complete = False
             self.reconnect_attempts = 0
-            
-            # Запускаем диалог с ботом и проходим регистрацию
-            self.logger.info("🚀 Запуск бота...")
-            await self.start_bot_dialog()
-            
-            if not self.registration_complete:
-                self.logger.warning("⚠️ Регистрация не завершена, пробуем еще раз...")
-                await asyncio.sleep(3)
-                await self.start_bot_dialog()
-            
             self.logger.info("🚀 Рассылка запущена")
             await self.send_next_command()
     
     def stop(self):
+        """Останавливает рассылку на аккаунте"""
         self.sending_enabled = False
         self.waiting_for_next = False
         self.logger.info("⏸️ Рассылка остановлена")
     
     async def send_next_command(self):
+        """Отправка команды /next"""
         if not self.sending_enabled or not self.bot_entity:
             return
         
@@ -535,12 +415,6 @@ class AccountSender:
             await asyncio.sleep(wait_time)
             await self.send_next_command()
             
-        except PeerIdInvalidError:
-            self.logger.warning("⚠️ Ошибка PeerIdInvalid, обновляем сущность бота...")
-            await self.get_bot_entity()
-            await asyncio.sleep(2)
-            await self.send_next_command()
-            
         except Exception as e:
             self.logger.error(f"❌ Ошибка /next: {e}")
             self.error_count += 1
@@ -556,6 +430,7 @@ class AccountSender:
             await self.send_next_command()
     
     def extract_target_name(self, text):
+        """Извлекает название из текста капчи"""
         if not text:
             return None
         
@@ -592,6 +467,7 @@ class AccountSender:
         return None
     
     def find_emoji_button(self, rows, target_name):
+        """Ищет кнопку по названию"""
         if not target_name:
             return None
         
@@ -621,6 +497,7 @@ class AccountSender:
         return None
     
     async def handle_captcha(self, event):
+        """Обрабатывает капчу"""
         if self.processing_captcha:
             return False
         
@@ -695,6 +572,7 @@ class AccountSender:
             self.processing_captcha = False
     
     def check_for_image(self, event):
+        """Проверяет, содержит ли сообщение изображение"""
         if not event.media:
             return False
             
@@ -709,6 +587,7 @@ class AccountSender:
         return False
     
     async def handle_bot_message(self, event):
+        """Обработка сообщений от бота"""
         if not self.sending_enabled:
             return
         
@@ -720,6 +599,7 @@ class AccountSender:
         message_text = event.raw_text
         message_media = event.media
         
+        # Вывод всех полученных сообщений в консоль
         print(f"\n📩 [{self.session_name}] Получено сообщение:")
         if message_text:
             print(f"📝 Текст: {message_text[:200]}")
@@ -736,14 +616,6 @@ class AccountSender:
         else:
             print(f"📎 Медиа: нет")
         
-        # Если регистрация не завершена, обрабатываем регистрационные сообщения
-        if not self.registration_complete:
-            if message_text and ('пол' in message_text.lower() or 'возраст' in message_text.lower() or 'выбери' in message_text.lower()):
-                if event.message.reply_markup or 'выбери' in message_text.lower():
-                    print(f"🔘 [{self.session_name}] Обнаружена регистрация")
-                    await self.start_bot_dialog()
-                    return
-        
         # Проверка на ошибку "слишком много запросов"
         if message_text and ("слишком много запросов" in message_text.lower() or 
                              "too many requests" in message_text.lower()):
@@ -758,6 +630,7 @@ class AccountSender:
         if message_text and ("проверку на робота" in message_text or 
                              "капча" in message_text.lower() or
                              "нажми на кнопку" in message_text):
+            
             if event.message.reply_markup and hasattr(event.message.reply_markup, 'rows'):
                 self.logger.warning("⚠️ Обнаружена капча!")
                 await self.handle_captcha(event)
@@ -768,6 +641,7 @@ class AccountSender:
                 self.waiting_for_next = False
                 self.logger.info("✅ Получено подтверждение (изображение)!")
                 print(f"✅ [{self.session_name}] Получено подтверждение (изображение)!")
+                
                 await asyncio.sleep(1.5)
                 await self.send_target_message()
             else:
@@ -779,14 +653,14 @@ class AccountSender:
                         await asyncio.sleep(3)
                         await self.send_next_command()
 
+
     async def send_target_message(self):
-        if not self.bot_entity:
-            await self.get_bot_entity()
-        
+        """Отправка целевого сообщения"""
         try:
             await self.client.send_message(self.bot_entity, self.message_text)
             self.logger.info(f"✅ Сообщение #{self.send_count} отправлено!")
             print(f"📤 [{self.session_name}] Сообщение #{self.send_count} отправлено!")
+            
             await asyncio.sleep(3)
             await self.send_next_command()
             
@@ -798,12 +672,6 @@ class AccountSender:
             await asyncio.sleep(wait_time)
             await self.send_next_command()
             
-        except PeerIdInvalidError:
-            self.logger.warning("⚠️ Ошибка PeerIdInvalid, обновляем сущность бота...")
-            await self.get_bot_entity()
-            await asyncio.sleep(2)
-            await self.send_target_message()
-            
         except Exception as e:
             self.logger.error(f"❌ Ошибка отправки: {e}")
             self.error_count += 1
@@ -813,10 +681,11 @@ class AccountSender:
 
 
 async def main():
+    """Главная функция"""
     print("\n" + "="*70)
-    print("🚀 МАССОВАЯ РАССЫЛКА В TELEGRAM (TDATA)")
+    print("🚀 МАССОВАЯ РАССЫЛКА В TELEGRAM")
     print("="*70)
-    print(f"📁 Папка с tdata: {TDATA_FOLDER}")
+    print(f"📁 Папка с сессиями: {SESSIONS_FOLDER}")
     print(f"📄 Файл с сообщением: {MESSAGE_FILE}")
     print("="*70 + "\n")
     
@@ -824,8 +693,7 @@ async def main():
     
     if not await manager.initialize_accounts():
         print("\n❌ Не удалось инициализировать ни один аккаунт!")
-        print("📁 Проверьте наличие папок tdata в директории tdata/")
-        print("   (скопируйте их с вашего компьютера через scp)")
+        print("📁 Проверьте наличие файлов сессий в папке sessions/")
         return
     
     await manager.auto_start()
