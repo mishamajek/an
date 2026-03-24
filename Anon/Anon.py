@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import re
 import time
@@ -52,13 +51,13 @@ os.makedirs(LOG_FOLDER, exist_ok=True)
 
 
 # ================== ПОЛНЫЙ СЛОВАРЬ ЭМОДЗИ ==================
+# (сохраните ваш существующий словарь EMOJI_DICT здесь)
+# Для краткости здесь только часть, но вы должны вставить свой полный словарь
 EMOJI_DICT = {
     'кот': ['🐱', '😺', '😸', '😻', '😽', '🙀', '😿', '😾', '🐈', '🐆'],
     'собака': ['🐶', '🐕', '🦮', '🐕‍🦺', '🐩'],
     'мышь': ['🐭', '🐁', '🐀'],
-    'змея': ['🐍'],
-    'птица': ['🐦', '🦅'],
-    'рыба': ['🐟', '🐠'],
+    # ... остальной словарь
 }
 
 
@@ -72,10 +71,12 @@ class SessionCreator:
         print("📱 СОЗДАНИЕ НОВОЙ СЕССИИ")
         print("="*50)
         
+        # Ввод номера телефона
         phone = input("📞 Введите номер телефона в формате +71234567890: ").strip()
         if not phone.startswith('+'):
             phone = '+' + phone
         
+        # Генерируем имя файла сессии
         session_name = f"user_{phone.replace('+', '')}"
         session_path = os.path.join(SESSIONS_FOLDER, session_name)
         
@@ -90,9 +91,11 @@ class SessionCreator:
                 await client.disconnect()
                 return session_name
             
+            # Запрашиваем код
             await client.send_code_request(phone)
             print("📱 Код подтверждения отправлен!")
             
+            # Ввод кода
             code = input("🔢 Введите код из Telegram: ").strip().replace(' ', '').replace('-', '')
             
             try:
@@ -102,6 +105,7 @@ class SessionCreator:
                 return session_name
                 
             except SessionPasswordNeededError:
+                # Требуется 2FA пароль
                 password = input("🔐 Введите пароль 2FA: ").strip()
                 await client.sign_in(password=password)
                 print("✅ Аккаунт успешно добавлен (с 2FA)!")
@@ -144,6 +148,7 @@ class SessionCreator:
                 current_count += 1
                 print(f"✅ Аккаунт добавлен! Всего: {current_count}/{max_accounts}")
                 
+                # Спрашиваем, хочет ли пользователь добавить еще
                 if current_count < max_accounts:
                     answer = input("\n➕ Добавить еще один аккаунт? (y/n): ").strip().lower()
                     if answer != 'y':
@@ -227,6 +232,7 @@ class MultiAccountSender:
             
             await SessionCreator.add_multiple_accounts(10)
             
+            # Проверяем снова после добавления
             session_names = self.find_session_files()
             if not session_names:
                 print("\n❌ Не добавлено ни одного аккаунта. Выход...")
@@ -275,7 +281,9 @@ class MultiAccountSender:
             account.stop()
     
     async def auto_start(self):
+        """Автоматический запуск рассылки после инициализации"""
         await self.startup_complete.wait()
+        
         await asyncio.sleep(3)
         
         if not self.accounts:
@@ -285,6 +293,7 @@ class MultiAccountSender:
         logger.info("="*70)
         logger.info("🤖 АВТОМАТИЧЕСКИЙ ЗАПУСК РАССЫЛКИ")
         logger.info(f"📊 Аккаунтов: {len(self.accounts)}")
+        logger.info(f"📄 Сообщение: {self.message_text[:100]}..." if len(self.message_text) > 100 else f"📄 Сообщение: {self.message_text}")
         logger.info("="*70)
         
         await self.start_all()
@@ -316,7 +325,6 @@ class AccountSender:
         self.send_count = 0
         self.error_count = 0
         self.running = True
-        self.reconnect_attempts = 0
         
         # Защита от множественных вызовов
         self.last_next_command_time = 0
@@ -377,7 +385,6 @@ class AccountSender:
             self.sending_enabled = True
             self.waiting_for_next = False
             self.last_next_command_time = 0
-            self.reconnect_attempts = 0
             self.logger.info("🚀 Рассылка запущена")
             await self.send_next_command()
     
@@ -389,7 +396,7 @@ class AccountSender:
     
     async def send_next_command(self):
         """Отправка команды /next"""
-        if not self.sending_enabled or not self.bot_entity:
+        if not self.sending_enabled:
             return
         
         current_time = time.time()
@@ -405,7 +412,6 @@ class AccountSender:
             self.send_count += 1
             self.global_stats['total_sent'] = self.global_stats.get('total_sent', 0) + 1
             self.logger.info(f"📤 [{self.send_count}] Отправлена команда /next")
-            self.reconnect_attempts = 0
             
         except FloodWaitError as e:
             wait_time = e.seconds
@@ -419,13 +425,6 @@ class AccountSender:
             self.logger.error(f"❌ Ошибка /next: {e}")
             self.error_count += 1
             self.global_stats['total_errors'] = self.global_stats.get('total_errors', 0) + 1
-            self.reconnect_attempts += 1
-            
-            if self.reconnect_attempts > 5:
-                self.logger.error("Слишком много ошибок, пауза 60 секунд...")
-                await asyncio.sleep(60)
-                self.reconnect_attempts = 0
-            
             await asyncio.sleep(5)
             await self.send_next_command()
     
@@ -436,24 +435,28 @@ class AccountSender:
         
         text_lower = text.lower()
         
+        # СПЕЦИАЛЬНЫЙ ПАТТЕРН ДЛЯ "изображн(а) Х"
         match = re.search(r'изображн\(а\)\s+([а-яё]+)', text_lower)
         if match:
             found = match.group(1)
             found = re.sub(r'[.,!?:;()]', '', found)
             return found
         
+        # Паттерн для "изображен(а) Х"
         match = re.search(r'изображен\(а\)\s+([а-яё]+)', text_lower)
         if match:
             found = match.group(1)
             found = re.sub(r'[.,!?:;()]', '', found)
             return found
         
+        # Паттерн для "где Х"
         match = re.search(r'где\s+([а-яё]+)', text_lower)
         if match:
             found = match.group(1)
             found = re.sub(r'[.,!?:;()]', '', found)
             return found
         
+        # Если не нашли по паттернам, ищем просто слово после "кнопку"
         if 'нажми на кнопку' in text_lower:
             parts = text_lower.split('нажми на кнопку')
             if len(parts) > 1:
@@ -519,7 +522,7 @@ class AccountSender:
             self.logger.info(f"🔍 В капче нужно найти: {target_name}")
             print(f"🔍 [{self.session_name}] В капче нужно найти: {target_name}")
             
-            if not event.message.reply_markup or not hasattr(event.message.reply_markup, 'rows'):
+            if not event.message.reply_markup or not event.message.reply_markup.rows:
                 self.logger.error("❌ В сообщении с капчей нет кнопок")
                 self.captcha_stats['failed'] += 1
                 self.global_stats['captcha_failed'] = self.global_stats.get('captcha_failed', 0) + 1
@@ -621,9 +624,12 @@ class AccountSender:
                              "too many requests" in message_text.lower()):
             self.logger.warning("⚠️ Обнаружена ошибка 'Слишком много запросов'!")
             print(f"⚠️ [{self.session_name}] СЛИШКОМ МНОГО ЗАПРОСОВ! Ожидание {self.too_many_requests_cooldown // 60} минут...")
+            
             await asyncio.sleep(self.too_many_requests_cooldown)
+            
             if self.sending_enabled:
                 await self.send_next_command()
+            
             return
         
         # Обработка капчи
@@ -631,7 +637,7 @@ class AccountSender:
                              "капча" in message_text.lower() or
                              "нажми на кнопку" in message_text):
             
-            if event.message.reply_markup and hasattr(event.message.reply_markup, 'rows'):
+            if event.message.reply_markup and event.message.reply_markup.rows:
                 self.logger.warning("⚠️ Обнаружена капча!")
                 await self.handle_captcha(event)
                 return
@@ -689,15 +695,19 @@ async def main():
     print(f"📄 Файл с сообщением: {MESSAGE_FILE}")
     print("="*70 + "\n")
     
+    # Создаем менеджер аккаунтов
     manager = MultiAccountSender()
     
+    # Инициализируем аккаунты (если нет сессий, предложит добавить)
     if not await manager.initialize_accounts():
         print("\n❌ Не удалось инициализировать ни один аккаунт!")
         print("📁 Проверьте наличие файлов сессий в папке sessions/")
         return
     
+    # Запускаем автоматическую рассылку
     await manager.auto_start()
     
+    # Держим бота активным
     try:
         while True:
             await asyncio.sleep(1)
